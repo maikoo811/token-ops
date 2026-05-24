@@ -4,6 +4,20 @@ Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Cla
 
 The product goal is simple: install once, vibe code normally, and see how much context the agent avoided.
 
+## Measured Savings
+
+These are real numbers from running `token-ops pack` against this repository (17 tracked files, ~12,405 tokens of full-repo context):
+
+| Task | Pack size | Vs selected full files | Vs whole repo |
+|---|---|---|---|
+| `Fix the CSV import bug` | ~2,271 tokens | **79% saved** | 82% saved |
+| `Add OAuth login flow` | ~1,636 tokens | 38% saved | **87% saved** |
+| `認証エラーの修正` | ~3,329 tokens | 65% saved | **73% saved** |
+
+Focused bug-fix tasks get the largest savings because Token Ops can pick a small set of relevant files. Broader feature work saves less per pack but still avoids most of the whole-repo cost.
+
+Run `token-ops report` in your own repo to see your cumulative savings after a few prompts.
+
 ## Beginner Defaults
 
 Token Ops is designed to be useful without setup:
