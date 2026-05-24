@@ -6,17 +6,35 @@ The product goal is simple: install once, vibe code normally, and see how much c
 
 ## Measured Savings
 
-These are real numbers from running `token-ops pack` against this repository (17 tracked files, ~12,405 tokens of full-repo context):
+Real numbers from running `token-ops pack` against this repository (17 tracked files, ~12,587 tokens of full-repo context):
 
 | Task | Pack size | Vs selected full files | Vs whole repo |
 |---|---|---|---|
-| `Fix the CSV import bug` | ~2,271 tokens | **79% saved** | 82% saved |
-| `Add OAuth login flow` | ~1,636 tokens | 38% saved | **87% saved** |
-| `認証エラーの修正` | ~3,329 tokens | 65% saved | **73% saved** |
+| `Fix the Japanese keyword tokenizer in extractKeywords` | ~3,959 tokens | 56% smaller | 69% smaller |
+| `Add an uninstall command to the CLI` | ~3,076 tokens | 33% smaller | 76% smaller |
+| `Build a compact context pack for the current task` | ~3,859 tokens | 28% smaller | 69% smaller |
 
-Focused bug-fix tasks get the largest savings because Token Ops can pick a small set of relevant files. Broader feature work saves less per pack but still avoids most of the whole-repo cost.
+A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pack.md) so you can see exactly what Token Ops produces.
 
-Run `token-ops report` in your own repo to see your cumulative savings after a few prompts.
+### What "saved" actually measures
+
+- **Pack size** is real bytes counted at `length / 4` (a rough token estimate).
+- **Vs selected full files** compares the pack against reading the same ranked files in full.
+- **Vs whole repo** compares against reading every tracked text file. This is an upper bound — a real agent wouldn't read everything, so treat this number as a ceiling, not a typical baseline.
+
+What this does NOT measure: whether the pack contained the right context, or how many follow-up reads the agent makes. Token Ops earns its keep when its snippets are sufficient for the task; it does not stop the agent from reading more when needed.
+
+### Verify these numbers yourself
+
+Inside this repository:
+
+```sh
+npm install
+npm test
+node bin/token-ops.js pack "Fix the Japanese keyword tokenizer in extractKeywords"
+```
+
+The `## Token Budget` section of the output is the source of the table above.
 
 ## Beginner Defaults
 
