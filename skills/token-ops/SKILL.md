@@ -7,6 +7,8 @@ description: Use Token Ops to reduce wasted context during AI coding sessions. T
 
 Token Ops helps vibe-coding users spend fewer tokens by giving the agent a compact task-focused context pack before it reads broadly.
 
+It is beginner friendly: no API key, no account, no cloud backend, and no setup conversation should be required.
+
 ## Use It When
 
 - The task may require exploring several files.
@@ -23,4 +25,4 @@ Token Ops helps vibe-coding users spend fewer tokens by giving the agent a compa
 
 ## User Tone
 
-Explain the result in plain language. Avoid graph or compiler terminology unless the user asks for it.
+Explain the result in plain language. Avoid graph or compiler terminology unless the user asks for it. Prefer phrases like "I used a smaller context first" and "estimated tokens saved."

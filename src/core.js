@@ -37,6 +37,42 @@ const STOP_WORDS = new Set([
   "で"
 ]);
 
+const JA_TO_EN = new Map([
+  ["キーワード", ["keyword"]],
+  ["抽出", ["extract", "extractor"]],
+  ["バグ", ["bug"]],
+  ["関数", ["function", "func"]],
+  ["テスト", ["test", "spec"]],
+  ["クラス", ["class"]],
+  ["型", ["type"]],
+  ["設定", ["config", "setting", "option"]],
+  ["認証", ["auth"]],
+  ["接続", ["connection", "connect"]],
+  ["削除", ["delete", "remove"]],
+  ["追加", ["add", "insert"]],
+  ["取得", ["get", "fetch"]],
+  ["保存", ["save", "persist"]],
+  ["読込", ["load", "read"]],
+  ["書込", ["write"]],
+  ["一覧", ["list"]],
+  ["詳細", ["detail"]],
+  ["概要", ["summary", "overview"]],
+  ["エラー", ["error", "err"]],
+  ["例外", ["exception", "exc"]],
+  ["検索", ["search", "find", "query"]],
+  ["並び替え", ["sort"]],
+  ["集計", ["aggregate", "count"]],
+  ["通知", ["notify", "notification"]],
+  ["ログ", ["log", "logger"]],
+  ["起動", ["start", "boot", "init"]],
+  ["終了", ["stop", "exit", "shutdown"]],
+  ["再起動", ["restart", "reboot"]],
+  ["監視", ["watch", "monitor", "observe"]],
+  ["同期", ["sync"]],
+  ["非同期", ["async"]],
+  ["並列", ["parallel", "concurrent"]]
+]);
+
 const SKIP_DIRS = new Set([
   ".git",
   "node_modules",
@@ -212,7 +248,7 @@ export function renderSavingsReport(report, lang = "en") {
 }
 
 export function shouldInjectForPrompt(prompt) {
-  if (!prompt || prompt.length < 12) {
+  if (!prompt || prompt.length < 6) {
     return false;
   }
 
@@ -220,7 +256,7 @@ export function shouldInjectForPrompt(prompt) {
     return false;
   }
 
-  return /fix|bug|add|implement|refactor|test|review|debug|change|update|コード|実装|修正|追加|テスト|レビュー|改善|エラー/i.test(prompt);
+  return /fix|bug|add|implement|refactor|test|review|debug|change|update|コード|実装|修正|追加|テスト|レビュー|改善|エラー|バグ|直|不具合|動かな|壊/i.test(prompt);
 }
 
 export function resolveLanguage(lang, task) {
@@ -304,15 +340,16 @@ function isTextFile(file) {
 }
 
 function extractKeywords(task) {
-  const words = (task.toLowerCase().match(/[a-z0-9_/-]{2,}|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]{1,}/gu) || [])
+  const words = (task.toLowerCase().match(/[a-z0-9_/-]{2,}|[\p{Script=Han}]{2,}|[\p{Script=Katakana}ー]{2,}/gu) || [])
     .map((word) => word.trim())
-    .filter((word) => word.length >= 2)
     .filter((word) => !STOP_WORDS.has(word));
 
   return [...new Set(words)].slice(0, 20);
 }
 
 function rankFiles(files, keywords, changedFiles, cwd) {
+  const bridgedKeywords = bridgeJapaneseKeywords(keywords);
+
   return files
     .map((file) => {
       const pathText = file.toLowerCase();
@@ -324,10 +361,22 @@ function rankFiles(files, keywords, changedFiles, cwd) {
         }
       }
 
+      for (const bridged of bridgedKeywords) {
+        if (pathText.includes(bridged)) {
+          score += 15;
+        }
+      }
+
       const content = readSmallFile(join(cwd, file)).toLowerCase();
       for (const keyword of keywords) {
         if (content.includes(keyword)) {
           score += 8;
+        }
+      }
+
+      for (const bridged of bridgedKeywords) {
+        if (content.includes(bridged)) {
+          score += 5;
         }
       }
 
@@ -340,6 +389,19 @@ function rankFiles(files, keywords, changedFiles, cwd) {
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score || a.file.localeCompare(b.file))
     .map((item) => item.file);
+}
+
+function bridgeJapaneseKeywords(keywords) {
+  const expanded = new Set();
+  for (const keyword of keywords) {
+    const englishForms = JA_TO_EN.get(keyword);
+    if (englishForms) {
+      for (const form of englishForms) {
+        expanded.add(form);
+      }
+    }
+  }
+  return expanded;
 }
 
 function buildSnippet(file, keywords, cwd, maxLines) {

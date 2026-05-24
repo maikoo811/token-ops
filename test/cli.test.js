@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
+import { shouldInjectForPrompt } from "../src/core.js";
 
 const cli = resolve("bin/token-ops.js");
 
@@ -74,6 +75,55 @@ test("claude prompt hook emits additional compact context", () => {
   assert.match(parsed.hookSpecificOutput.additionalContext, /Token Ops コンテキストパック/);
   assert.match(parsed.hookSpecificOutput.additionalContext, /トークン予算/);
   assert.match(parsed.hookSpecificOutput.additionalContext, /README\.md/);
+});
+
+test("splits Japanese prompts into per-word keywords, not one long blob", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-ja-keywords-"));
+  execFileSync("git", ["init"], { cwd, stdio: "ignore" });
+  writeFileSync(join(cwd, "README.md"), "# Demo\nキーワード抽出を行う\n");
+  execFileSync("git", ["add", "."], { cwd });
+  execFileSync("git", ["-c", "user.email=t@e.com", "-c", "user.name=T", "commit", "-m", "init"], { cwd, stdio: "ignore" });
+
+  const output = execFileSync(process.execPath, [cli, "pack", "キーワード抽出のバグを直して"], {
+    cwd,
+    encoding: "utf8"
+  });
+
+  assert.match(output, /`キーワード`/);
+  assert.match(output, /`抽出`/);
+  assert.match(output, /`バグ`/);
+  assert.doesNotMatch(output, /`キーワード抽出のバグを直して`/);
+});
+
+test("bridges Japanese keywords to English file names during ranking", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-ja-bridge-"));
+  execFileSync("git", ["init"], { cwd, stdio: "ignore" });
+  writeFileSync(
+    join(cwd, "keyword_extractor.js"),
+    "export function extractKeywords(task) {\n  return task.split(/\\s+/);\n}\n"
+  );
+  writeFileSync(join(cwd, "unrelated.js"), "export const noop = () => {};\n");
+  execFileSync("git", ["add", "."], { cwd });
+  execFileSync("git", ["-c", "user.email=t@e.com", "-c", "user.name=T", "commit", "-m", "init"], { cwd, stdio: "ignore" });
+
+  const output = execFileSync(process.execPath, [cli, "pack", "キーワード抽出のバグを直して"], {
+    cwd,
+    encoding: "utf8"
+  });
+
+  const relevantSection = output.split(/##\s+関連ファイル/)[1] || "";
+  assert.match(relevantSection, /keyword_extractor\.js/);
+  assert.doesNotMatch(output, /`keyword`/);
+  assert.doesNotMatch(output, /`extract`/);
+});
+
+test("hook fires for natural Japanese bug-fix prompts", () => {
+  assert.equal(shouldInjectForPrompt("バグを直して"), true);
+  assert.equal(shouldInjectForPrompt("この関数が動かない"), true);
+  assert.equal(shouldInjectForPrompt("不具合を直したい"), true);
+  assert.equal(shouldInjectForPrompt("壊れているので見て"), true);
+  assert.equal(shouldInjectForPrompt("ok"), false);
+  assert.equal(shouldInjectForPrompt("token-opsを試す"), false);
 });
 
 test("prints high cost files as JSON", () => {
