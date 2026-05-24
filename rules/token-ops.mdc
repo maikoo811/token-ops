@@ -1,0 +1,16 @@
+---
+description: Reduce wasted context with Token Ops before broad exploration.
+alwaysApply: true
+---
+
+Use Token Ops before broad repository exploration, large file reads, generated files, lockfiles, or noisy logs.
+
+Default flow:
+
+1. Call `build_compact_context` with the user's task.
+2. Work from the returned snippets and token budget first.
+3. Read additional files only when the compact context is insufficient.
+4. Call `list_high_cost_files` before opening unusually large files.
+5. Call `report_saved_tokens` when the user asks about tokens, cost, usage, or savings.
+
+Keep the user-facing explanation simple: Token Ops is reducing wasted context, not replacing engineering judgment.

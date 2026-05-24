@@ -1,0 +1,25 @@
+{
+  "name": "token-ops",
+  "displayName": "Token Ops",
+  "version": "0.2.0",
+  "description": "Reduce wasted context for vibe coding by building compact task context and showing saved-token reports.",
+  "publisher": "token-ops",
+  "license": "MIT",
+  "categories": ["Productivity", "Agent Orchestration"],
+  "keywords": ["tokens", "context", "cursor", "mcp", "vibe-coding"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/token-ops/token-ops"
+  },
+  "components": {
+    "rules": ["./rules/token-ops.mdc"],
+    "skills": ["./skills/token-ops"],
+    "commands": ["./commands/compact-context.md", "./commands/token-report.md"],
+    "mcpServers": {
+      "token-ops": {
+        "command": "node",
+        "args": ["${PLUGIN_ROOT}/mcp/server.js"]
+      }
+    }
+  }
+}

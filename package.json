@@ -1,0 +1,26 @@
+{
+  "name": "token-ops",
+  "version": "0.2.0",
+  "description": "A local Cursor plugin and CLI that reduces wasted AI coding context.",
+  "type": "module",
+  "bin": {
+    "token-ops": "./bin/token-ops.js",
+    "token-ops-mcp": "./mcp/server.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "ai",
+    "tokens",
+    "context",
+    "cursor",
+    "claude-code",
+    "mcp",
+    "vibe-coding"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
