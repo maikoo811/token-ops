@@ -10,6 +10,9 @@ import {
   resolveLanguage
 } from "../src/core.js";
 
+const BEGINNER_MAX_FILES = 6;
+const BEGINNER_MAX_LINES = 80;
+
 let buffer = Buffer.alloc(0);
 
 process.stdin.on("data", (chunk) => {
@@ -107,8 +110,8 @@ function callTool(name, args) {
     const result = generatePack({
       task,
       cwd,
-      maxFiles: Number(args.maxFiles || 6),
-      maxLines: Number(args.maxLines || 80),
+      maxFiles: Number(args.maxFiles || BEGINNER_MAX_FILES),
+      maxLines: Number(args.maxLines || BEGINNER_MAX_LINES),
       lang
     });
     recordSessionEvent(cwd, {
@@ -155,14 +158,14 @@ function tools() {
   return [
     {
       name: "build_compact_context",
-      description: "Create a small task-focused context pack before broad code exploration.",
+      description: "Create a small context pack before reading many files.",
       inputSchema: {
         type: "object",
         properties: {
           task: { type: "string", description: "The coding task or user request." },
           cwd: { type: "string", description: "Repository root. Defaults to server cwd." },
-          maxFiles: { type: "number", description: "Maximum relevant files to include." },
-          maxLines: { type: "number", description: "Maximum snippet lines per file." },
+          maxFiles: { type: "number", description: `Maximum relevant files to include. Default: ${BEGINNER_MAX_FILES}.` },
+          maxLines: { type: "number", description: `Maximum snippet lines per file. Default: ${BEGINNER_MAX_LINES}.` },
           lang: { type: "string", enum: ["auto", "en", "ja"] }
         },
         required: ["task"]
@@ -170,7 +173,7 @@ function tools() {
     },
     {
       name: "estimate_context_cost",
-      description: "Estimate token cost for selected files and whole repository context.",
+      description: "Estimate how expensive repository context may be.",
       inputSchema: {
         type: "object",
         properties: {
@@ -182,7 +185,7 @@ function tools() {
     },
     {
       name: "list_high_cost_files",
-      description: "List large tracked text files that are expensive to put in context.",
+      description: "List files that are expensive for Cursor to read.",
       inputSchema: {
         type: "object",
         properties: {
@@ -193,7 +196,7 @@ function tools() {
     },
     {
       name: "report_saved_tokens",
-      description: "Show the saved-token report for this repository.",
+      description: "Show the local Token Ops savings report.",
       inputSchema: {
         type: "object",
         properties: {

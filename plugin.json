@@ -1,15 +1,26 @@
 {
   "name": "token-ops",
-  "displayName": "Token Ops",
+  "displayName": "Token Ops: AI Token Saver",
   "version": "0.2.0",
-  "description": "Reduce wasted context for vibe coding by building compact task context and showing saved-token reports.",
+  "description": "Stop Cursor from wasting tokens on broad repo reads. Runs locally with no API key, account, or cloud backend.",
   "publisher": "token-ops",
   "license": "MIT",
   "categories": ["Productivity", "Agent Orchestration"],
   "keywords": ["tokens", "context", "cursor", "mcp", "vibe-coding"],
+  "homepage": "https://github.com/maikoo811/token-ops",
+  "bugs": {
+    "url": "https://github.com/maikoo811/token-ops/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/token-ops/token-ops"
+    "url": "https://github.com/maikoo811/token-ops"
+  },
+  "privacy": {
+    "localOnly": true,
+    "requiresApiKey": false,
+    "requiresAccount": false,
+    "telemetry": "off-by-default",
+    "summary": "Token Ops runs as a local MCP server. No source code leaves your machine by default."
   },
   "components": {
     "rules": ["./rules/token-ops.mdc"],

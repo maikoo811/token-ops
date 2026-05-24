@@ -4,6 +4,17 @@ Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Cla
 
 The product goal is simple: install once, vibe code normally, and see how much context the agent avoided.
 
+## Beginner Defaults
+
+Token Ops is designed to be useful without setup:
+
+- No API key
+- No account
+- No cloud backend
+- No telemetry by default
+- Local MCP server
+- Beginner defaults: 6 files, 80 snippet lines per file, auto language
+
 ## Cursor Plugin
 
 Token Ops is being shaped for Cursor Marketplace distribution as a free local plugin.
@@ -16,6 +27,20 @@ The plugin includes:
 - Commands for compact context and saved-token reports
 
 The MCP server runs locally. It does not require a hosted backend or a Token Ops account.
+
+After installation, users can ask Cursor:
+
+```text
+Show my Token Ops savings report.
+```
+
+```text
+Use Token Ops before changing this code.
+```
+
+```text
+Which files are expensive for Cursor to read?
+```
 
 ## MCP Tools
 
@@ -106,6 +131,19 @@ The package also exposes the server at:
 
 ```sh
 node mcp/server.js
+```
+
+Cursor-compatible local MCP template:
+
+```json
+{
+  "mcpServers": {
+    "token-ops": {
+      "command": "node",
+      "args": ["${workspaceFolder}/mcp/server.js"]
+    }
+  }
+}
 ```
 
 ## What It Includes
