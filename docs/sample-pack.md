@@ -4,11 +4,11 @@
 Fix the Japanese keyword tokenizer in extractKeywords
 
 ## Token Budget
-- Generated pack: ~5,015 tokens
-- Selected full files baseline: ~14,174 tokens (6 files)
-- Estimated saved: ~9,159 tokens (65%)
-- Whole repository baseline: ~20,823 tokens (19 files)
-- Avoided vs whole repository: ~15,808 tokens (76%)
+- Generated pack: ~5,360 tokens
+- Selected full files baseline: ~14,622 tokens (6 files)
+- Estimated saved: ~9,262 tokens (63%)
+- Whole repository baseline: ~22,822 tokens (20 files)
+- Avoided vs whole repository: ~17,462 tokens (77%)
 
 ## Suggested Prompt
 Use the context below to work on this task. Prefer the referenced files and snippets before reading broader repository context. If the snippets are insufficient, ask for or inspect only the smallest additional files needed.
@@ -17,26 +17,216 @@ Task: Fix the Japanese keyword tokenizer in extractKeywords
 
 ## Repository
 - Root: /Users/maiko/Documents/dev/token-ops
-- Branch: feat/token-estimate-precision
-- Estimated snippet tokens: ~4,669
+- Branch: chore/marketplace-manifest
+- Estimated snippet tokens: ~5,000
 
 ## Git Status
--  M README.md
--  M src/core.js
--  M test/core.test.js
+-  M CHANGELOG.md
+-  M mcp/server.js
+-  M package.json
+- D  plugin.json
+- ?? .cursor-plugin/
 
 ## Keywords
 `japanese`, `keyword`, `tokenizer`, `in`, `extractkeywords`
 
 ## Relevant Files
+- CHANGELOG.md (~1,026 tokens full file)
+- .cursor-plugin/plugin.json (~252 tokens full file)
+- docs/sample-pack.md (~5,018 tokens full file)
 - README.md (~1,420 tokens full file)
 - src/core.js (~4,712 tokens full file)
-- test/core.test.js (~1,551 tokens full file)
-- plugin.json (~294 tokens full file)
-- docs/sample-pack.md (~4,003 tokens full file)
 - test/cli.test.js (~2,194 tokens full file)
 
 ## Snippets
+### CHANGELOG.md
+
+```md
+   1 | # Changelog
+   2 | 
+   3 | All notable changes to Token Ops are documented in this file.
+   4 | 
+   5 | The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+   6 | and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+   7 | 
+   8 | ## [0.3.1] — 2026-05-25
+   9 | 
+  10 | ### Changed
+  11 | - Refactored the plugin manifest to match the official Cursor Marketplace schema (`https://cursor.com/schemas/cursor-plugin/plugin.json`):
+  12 |   - Moved manifest from root `plugin.json` to `.cursor-plugin/plugin.json` (required location).
+  13 |   - Replaced the `components: { ... }` wrapper with top-level `skills` / `rules` / `commands` / `mcpServers` keys.
+  14 |   - Switched `categories: [array]` → `category: "developer-tools"` (singular).
+  15 |   - Converted `repository` from an object to a URL string.
+  16 |   - Added `author: { name, email }` and SPDX `license`.
+  17 |   - Removed `bugs` and `privacy` keys (not in the schema; `additionalProperties: false` would reject the manifest at validation).
+  18 | - The CLI, MCP server, and Claude Code integrations are unaffected — this is purely a marketplace packaging change.
+  19 | 
+  20 | ## [0.3.0] — 2026-05-25
+  21 | 
+  22 | ### Added
+  23 | - `token-ops uninstall [target]` command — mirrors `install`, removes only what install created and preserves unrelated `.claude/settings.local.json` hooks/permissions and `AGENTS.md` content.
+  24 | - LICENSE file (MIT) so GitHub auto-detects the license and Cursor Marketplace requirements are met.
+  25 | - GitHub Actions CI workflow running `npm test` on Node 18 / 20 / 22 for every push and PR to `main`.
+  26 | - Unit-test suite for the pure helpers (`extractKeywords`, `estimateTokens`, `finalizeTokenBudget`, `shouldInjectForPrompt`, `resolveLanguage`) — 15 tests in `test/core.test.js`.
+  27 | - `docs/sample-pack.md` checked in as a verbatim sample of pack output.
+  28 | - "Measured Savings" section in README with a Mermaid bar chart, a real-task table, a "what 'saved' actually measures" explainer, and verification steps.
+  29 | 
+  30 | ### Changed
+  31 | - **`estimateTokens` is now script-aware**: ASCII counted at `length / 4`, CJK (Han / Hiragana / Katakana) counted at `length / 1.5`. Token estimates for Japanese-heavy content now better reflect BPE tokenizer behavior. Numerical savings reports will shift accordingly.
+  32 | - **`extractKeywords` splits Japanese into per-word tokens** (Han runs and Katakana runs of 2+ chars), instead of treating contiguous CJK as a single keyword. Fixes the case where a whole Japanese sentence was used as one keyword.
+  33 | - **`shouldInjectForPrompt` adds JA bug-report triggers** (`バグ`, `直`, `不具合`, `動かな`, `壊`) and lowers the minimum prompt length from 12 to 6 chars so short Japanese requests like `バグを直して` fire the Claude Code hook.
+  34 | - **`shouldInjectForPrompt` uses `\b` word boundaries for English triggers** so `fix` no longer matches `prefix` / `fixture` and `add` no longer matches `address`. Japanese substring matching is preserved (`\b` is unreliable around CJK).
+  35 | - **`rankFiles` bridges ~30 Japanese tech terms to their English equivalents** during file ranking, so Japanese prompts can match English-named files (e.g. `キーワード` → `keyword`, `バグ` → `bug`).
+  36 | - Default GitHub branch changed from a feature branch to `main`.
+  37 | - Repository description set on GitHub.
+  38 | 
+  39 | ### Fixed
+  40 | - Cleaned up stale feature branch (`codex/cursor-plugin-mvp`) on origin.
+  41 | - `.gitignore` now excludes `.claude/` since installed hook configs contain absolute paths that would break for other contributors.
+  42 | 
+  43 | ## [0.2.0] — 2026-05-24
+  44 | 
+  45 | ### Added
+  46 | - Initial Cursor Marketplace plugin packaging (`plugin.json`, beginner defaults of 6 files / 80 snippet lines).
+  47 | - One-command editor setup: `token-ops install [target]` writes Claude Code skill, Claude Code `UserPromptSubmit` hook, Cursor rule, and `AGENTS.md` block.
+  48 | - MCP server (`mcp/server.js`) exposing `build_compact_context`, `estimate_context_cost`, `list_high_cost_files`, `report_saved_tokens`.
+  49 | - CLI commands: `pack`, `report`, `cost`, `high-cost-files`, `install`, `hook`.
+  50 | - `MARKETPLACE.md` and `SECURITY.md` documentation for distribution and privacy posture.
+  51 | - Bilingual output (auto / en / ja) for packs and the savings report.
+  52 | 
+```
+
+### .cursor-plugin/plugin.json
+
+```json
+   1 | {
+   2 |   "$schema": "https://cursor.com/schemas/cursor-plugin/plugin.json",
+   3 |   "name": "token-ops",
+   4 |   "displayName": "Token Ops: AI Token Saver",
+   5 |   "description": "Stop Cursor and Claude Code from wasting tokens on broad repo reads. Runs locally with no API key, account, or cloud backend.",
+   6 |   "version": "0.3.1",
+   7 |   "author": {
+   8 |     "name": "Maiko Kojima",
+   9 |     "email": "694169+maikoo811@users.noreply.github.com"
+  10 |   },
+  11 |   "publisher": "maikoo811",
+  12 |   "homepage": "https://github.com/maikoo811/token-ops",
+  13 |   "repository": "https://github.com/maikoo811/token-ops",
+  14 |   "license": "MIT",
+  15 |   "category": "developer-tools",
+  16 |   "keywords": [
+  17 |     "tokens",
+  18 |     "context",
+  19 |     "cursor",
+  20 |     "claude-code",
+  21 |     "mcp",
+  22 |     "vibe-coding"
+  23 |   ],
+  24 |   "tags": [
+  25 |     "tokens",
+  26 |     "context",
+  27 |     "mcp",
+  28 |     "productivity",
+  29 |     "agents"
+  30 |   ],
+  31 |   "rules": "./rules/",
+  32 |   "skills": "./skills/",
+  33 |   "commands": "./commands/",
+  34 |   "mcpServers": {
+  35 |     "token-ops": {
+  36 |       "command": "node",
+  37 |       "args": ["${PLUGIN_ROOT}/mcp/server.js"]
+  38 |     }
+  39 |   }
+  40 | }
+  41 | 
+```
+
+### docs/sample-pack.md
+
+```md
+   1 | # Token Ops Context Pack
+   2 | 
+   3 | ## Task
+   4 | Fix the Japanese keyword tokenizer in extractKeywords
+   5 | 
+   6 | ## Token Budget
+   7 | - Generated pack: ~5,015 tokens
+   8 | - Selected full files baseline: ~14,174 tokens (6 files)
+   9 | - Estimated saved: ~9,159 tokens (65%)
+  10 | - Whole repository baseline: ~20,823 tokens (19 files)
+  11 | - Avoided vs whole repository: ~15,808 tokens (76%)
+  12 | 
+  13 | ## Suggested Prompt
+  14 | Use the context below to work on this task. Prefer the referenced files and snippets before reading broader repository context. If the snippets are insufficient, ask for or inspect only the smallest additional files needed.
+  15 | 
+  16 | Task: Fix the Japanese keyword tokenizer in extractKeywords
+  17 | 
+  18 | ## Repository
+  19 | - Root: /Users/maiko/Documents/dev/token-ops
+  20 | - Branch: feat/token-estimate-precision
+  21 | - Estimated snippet tokens: ~4,669
+  22 | 
+  23 | ## Git Status
+  24 | -  M README.md
+  25 | -  M src/core.js
+  26 | -  M test/core.test.js
+  27 | 
+  28 | ## Keywords
+  29 | `japanese`, `keyword`, `tokenizer`, `in`, `extractkeywords`
+  30 | 
+  31 | ## Relevant Files
+  32 | - README.md (~1,420 tokens full file)
+  33 | - src/core.js (~4,712 tokens full file)
+  34 | - test/core.test.js (~1,551 tokens full file)
+  35 | - plugin.json (~294 tokens full file)
+  36 | - docs/sample-pack.md (~4,003 tokens full file)
+  37 | - test/cli.test.js (~2,194 tokens full file)
+  38 | 
+  39 | ## Snippets
+  40 | ### README.md
+  41 | 
+  42 | ```md
+  43 |    1 | # Token Ops
+  44 |    2 | 
+  45 |    3 | Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Claude Code, Codex, and other MCP-compatible agents a compact task-focused context pack before they read broadly, then records an estimated saved-token report.
+  46 |    4 | 
+  47 |    5 | The product goal is simple: install once, vibe code normally, and see how much context the agent avoided.
+  48 |    6 | 
+  49 |    7 | ## Measured Savings
+  50 |    8 | 
+  51 |    9 | Real numbers from running `token-ops pack` against this repository (19 tracked files, ~20,780 tokens of full-repo context, script-aware estimator):
+  52 |   10 | 
+  53 |   11 | ```mermaid
+  54 |   12 | ---
+  55 |   13 | config:
+  56 |   14 |   xyChart:
+  57 |   15 |     width: 760
+  58 |   16 |     height: 320
+  59 |   17 |   themeVariables:
+  60 |   18 |     xyChart:
+  61 |   19 |       plotColorPalette: "#16a34a"
+  62 |   20 | ---
+  63 |   21 | xychart-beta
+  64 |   22 |   title "Tokens saved per pack (vs whole-repo baseline, higher is better)"
+  65 |   23 |   x-axis ["Fix JA tokenizer", "Add uninstall", "Build pack"]
+  66 |   24 |   y-axis "Tokens saved" 0 --> 20000
+  67 |   25 |   bar [15811, 17607, 16127]
+  68 |   26 | ```
+  69 |   27 | 
+  70 |   28 | | Task | Pack size | Vs selected full files | Vs whole repo |
+  71 |   29 | |---|---|---|---|
+  72 |   30 | | `Fix the Japanese keyword tokenizer in extractKeywords` | ~4,969 tokens | 65% smaller | 76% smaller |
+  73 |   31 | | `Add an uninstall command to the CLI` | ~3,173 tokens | 63% smaller | 85% smaller |
+  74 |   32 | | `Build a compact context pack for the current task` | ~4,653 tokens | 68% smaller | 78% smaller |
+  75 |   33 | 
+  76 |   34 | A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pack.md) so you can see exactly what Token Ops produces.
+  77 |   35 | 
+  78 |   36 | ### What "saved" actually measures
+  79 |   37 | 
+  80 |   38 | - **Pack size** is a rough token estimate: `length / 4` for ASCII and `length / 1.5` for CJK characters, summed. BPE tokenizers split CJK more aggressively than ASCII, so a single ratio underestimates Japanese-heavy content.
+```
+
 ### README.md
 
 ```md
@@ -205,218 +395,6 @@ Task: Fix the Japanese keyword tokenizer in extractKeywords
  131 |   return {
  132 |     markdown,
  133 |     budget: finalBudget,
-```
-
-### test/core.test.js
-
-```js
-   1 | import test from "node:test";
-   2 | import assert from "node:assert/strict";
-   3 | import {
-   4 |   extractKeywords,
-   5 |   estimateTokens,
-   6 |   finalizeTokenBudget,
-   7 |   shouldInjectForPrompt,
-   8 |   resolveLanguage
-   9 | } from "../src/core.js";
-  10 | 
-  11 | // ---- extractKeywords ----
-  12 | 
-  13 | test("extractKeywords: ASCII tokens are lowercased and stop words dropped", () => {
-  14 |   const out = extractKeywords("Fix the CSV import bug");
-  15 |   assert.deepEqual(out, ["csv", "import", "bug"]);
-  16 | });
-  17 | 
-  18 | test("extractKeywords: Japanese is split into per-word Han/Katakana tokens", () => {
-  19 |   const out = extractKeywords("キーワード抽出のバグを直して");
-  20 |   assert.ok(out.includes("キーワード"));
-  21 |   assert.ok(out.includes("抽出"));
-  22 |   assert.ok(out.includes("バグ"));
-  23 |   assert.ok(!out.includes("キーワード抽出のバグを直して"));
-  24 | });
-  25 | 
-  26 | test("extractKeywords: hiragana-only tokens are dropped (grammar particles)", () => {
-  27 |   const out = extractKeywords("ファイルをひらいて");
-  28 |   assert.ok(out.includes("ファイル"));
-  29 |   assert.ok(!out.includes("ひらいて"));
-  30 | });
-  31 | 
-  32 | test("extractKeywords: drops Japanese stop words 修正/追加/実装/変更", () => {
-  33 |   // Note: contiguous Han runs become a single token (no morphological split),
-  34 |   // so "認証機能" is one keyword, not 認証 + 機能.
-  35 |   const out = extractKeywords("バグを修正したい");
-  36 |   assert.ok(out.includes("バグ"));
-  37 |   assert.ok(!out.includes("修正"), "stop word 修正 should be dropped");
-  38 | });
-  39 | 
-  40 | test("extractKeywords: returns at most 20 unique keywords", () => {
-  41 |   const longTask = Array.from({ length: 40 }, (_, index) => `kw${index}`).join(" ");
-  42 |   const out = extractKeywords(longTask);
-  43 |   assert.equal(out.length, 20);
-  44 |   assert.equal(new Set(out).size, out.length);
-  45 | });
-  46 | 
-  47 | // ---- estimateTokens ----
-  48 | 
-  49 | test("estimateTokens: rounds up to the nearest token (ASCII)", () => {
-  50 |   assert.equal(estimateTokens(""), 0);
-  53 |   assert.equal(estimateTokens("abcde"), 2);
-  54 | });
-  55 | 
-  56 | test("estimateTokens: ASCII scales at ~1 token per 4 chars", () => {
-  57 |   const text = "x".repeat(400);
-  58 |   assert.equal(estimateTokens(text), 100);
-  59 | });
-  60 | 
-  61 | test("estimateTokens: Japanese is denser than ASCII (~1 token per 1.5 chars)", () => {
-  62 |   // 6 Japanese chars under the old 1/4 heuristic = ceil(6/4) = 2.
-  63 |   // New heuristic counts CJK at 1/1.5, so 6 chars = ceil(4) = 4.
-  64 |   assert.equal(estimateTokens("バグを直して"), 4);
-  65 |   // 60 Japanese chars under old = ceil(60/4) = 15; under new = ceil(60/1.5) = 40.
-  66 |   assert.equal(estimateTokens("あ".repeat(60)), 40);
-  67 | });
-  68 | 
-  69 | test("estimateTokens: mixed-script text sums per-script estimates", () => {
-  70 |   // "Fix バグ" = 4 ASCII + 1 space + 2 JA. Old: ceil(7/4) = 2. New: ceil(5/4 + 2/1.5) = ceil(1.25 + 1.33) = 3.
-  71 |   assert.equal(estimateTokens("Fix バグ"), 3);
-  72 | });
-  73 | 
-  74 | // ---- finalizeTokenBudget ----
-  75 | 
-  76 | test("finalizeTokenBudget: computes saved tokens and percent vs selected files", () => {
-  77 |   const out = finalizeTokenBudget(
-  78 |     {
-  79 |       selectedFileCount: 3,
-  80 |       repoFileCount: 10,
-  81 |       selectedFullTokens: 10000,
-  82 |       packTokens: 0,
-```
-
-### plugin.json
-
-```json
-   1 | {
-   2 |   "name": "token-ops",
-   3 |   "displayName": "Token Ops: AI Token Saver",
-   4 |   "version": "0.2.0",
-   5 |   "description": "Stop Cursor from wasting tokens on broad repo reads. Runs locally with no API key, account, or cloud backend.",
-   6 |   "publisher": "token-ops",
-   7 |   "license": "MIT",
-   8 |   "categories": ["Productivity", "Agent Orchestration"],
-   9 |   "keywords": ["tokens", "context", "cursor", "mcp", "vibe-coding"],
-  10 |   "homepage": "https://github.com/maikoo811/token-ops",
-  11 |   "bugs": {
-  12 |     "url": "https://github.com/maikoo811/token-ops/issues"
-  13 |   },
-  14 |   "repository": {
-  15 |     "type": "git",
-  16 |     "url": "https://github.com/maikoo811/token-ops"
-  17 |   },
-  18 |   "privacy": {
-  19 |     "localOnly": true,
-  20 |     "requiresApiKey": false,
-  21 |     "requiresAccount": false,
-  22 |     "telemetry": "off-by-default",
-  23 |     "summary": "Token Ops runs as a local MCP server. No source code leaves your machine by default."
-  24 |   },
-  25 |   "components": {
-  26 |     "rules": ["./rules/token-ops.mdc"],
-  27 |     "skills": ["./skills/token-ops"],
-  28 |     "commands": ["./commands/compact-context.md", "./commands/token-report.md"],
-  29 |     "mcpServers": {
-  30 |       "token-ops": {
-  31 |         "command": "node",
-  32 |         "args": ["${PLUGIN_ROOT}/mcp/server.js"]
-  33 |       }
-  34 |     }
-  35 |   }
-  36 | }
-  37 | 
-```
-
-### docs/sample-pack.md
-
-```md
-   1 | # Token Ops Context Pack
-   2 | 
-   3 | ## Task
-   4 | Fix the Japanese keyword tokenizer in extractKeywords
-   5 | 
-   6 | ## Token Budget
-   7 | - Generated pack: ~3,959 tokens
-   8 | - Selected full files baseline: ~9,078 tokens (6 files)
-   9 | - Estimated saved: ~5,119 tokens (56%)
-  10 | - Whole repository baseline: ~12,587 tokens (17 files)
-  11 | - Avoided vs whole repository: ~8,628 tokens (69%)
-  12 | 
-  13 | ## Suggested Prompt
-  14 | Use the context below to work on this task. Prefer the referenced files and snippets before reading broader repository context. If the snippets are insufficient, ask for or inspect only the smallest additional files needed.
-  15 | 
-  16 | Task: Fix the Japanese keyword tokenizer in extractKeywords
-  17 | 
-  18 | ## Repository
-  19 | - Root: /Users/maiko/Documents/dev/token-ops
-  20 | - Branch: docs/savings-example
-  21 | - Estimated snippet tokens: ~3,626
-  22 | 
-  23 | ## Git Status
-  24 | - Clean
-  25 | 
-  26 | ## Keywords
-  27 | `japanese`, `keyword`, `tokenizer`, `in`, `extractkeywords`
-  28 | 
-  29 | ## Relevant Files
-  30 | - plugin.json (~294 tokens full file)
-  31 | - test/cli.test.js (~1,407 tokens full file)
-  32 | - bin/token-ops.js (~1,700 tokens full file)
-  33 | - src/integrations.js (~1,215 tokens full file)
-  34 | - src/core.js (~4,342 tokens full file)
-  35 | - package.json (~120 tokens full file)
-  36 | 
-  37 | ## Snippets
-  38 | ### plugin.json
-  39 | 
-  40 | ```json
-  41 |    1 | {
-  42 |    2 |   "name": "token-ops",
-  43 |    3 |   "displayName": "Token Ops: AI Token Saver",
-  44 |    4 |   "version": "0.2.0",
-  45 |    5 |   "description": "Stop Cursor from wasting tokens on broad repo reads. Runs locally with no API key, account, or cloud backend.",
-  46 |    6 |   "publisher": "token-ops",
-  47 |    7 |   "license": "MIT",
-  48 |    8 |   "categories": ["Productivity", "Agent Orchestration"],
-  49 |    9 |   "keywords": ["tokens", "context", "cursor", "mcp", "vibe-coding"],
-  50 |   10 |   "homepage": "https://github.com/maikoo811/token-ops",
-  51 |   11 |   "bugs": {
-  52 |   12 |     "url": "https://github.com/maikoo811/token-ops/issues"
-  53 |   13 |   },
-  54 |   14 |   "repository": {
-  55 |   15 |     "type": "git",
-  56 |   16 |     "url": "https://github.com/maikoo811/token-ops"
-  57 |   17 |   },
-  58 |   18 |   "privacy": {
-  59 |   19 |     "localOnly": true,
-  60 |   20 |     "requiresApiKey": false,
-  61 |   21 |     "requiresAccount": false,
-  62 |   22 |     "telemetry": "off-by-default",
-  63 |   23 |     "summary": "Token Ops runs as a local MCP server. No source code leaves your machine by default."
-  64 |   24 |   },
-  65 |   25 |   "components": {
-  66 |   26 |     "rules": ["./rules/token-ops.mdc"],
-  67 |   27 |     "skills": ["./skills/token-ops"],
-  68 |   28 |     "commands": ["./commands/compact-context.md", "./commands/token-report.md"],
-  69 |   29 |     "mcpServers": {
-  70 |   30 |       "token-ops": {
-  71 |   31 |         "command": "node",
-  72 |   32 |         "args": ["${PLUGIN_ROOT}/mcp/server.js"]
-  73 |   33 |       }
-  74 |   34 |     }
-  75 |   35 |   }
-  76 |   36 | }
-  77 |   37 | 
-  78 | ```
-  79 | 
-  80 | ### test/cli.test.js
 ```
 
 ### test/cli.test.js

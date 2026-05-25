@@ -5,6 +5,18 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-05-25
+
+### Changed
+- Refactored the plugin manifest to match the official Cursor Marketplace schema (`https://cursor.com/schemas/cursor-plugin/plugin.json`):
+  - Moved manifest from root `plugin.json` to `.cursor-plugin/plugin.json` (required location).
+  - Replaced the `components: { ... }` wrapper with top-level `skills` / `rules` / `commands` / `mcpServers` keys.
+  - Switched `categories: [array]` → `category: "developer-tools"` (singular).
+  - Converted `repository` from an object to a URL string.
+  - Added `author: { name, email }` and SPDX `license`.
+  - Removed `bugs` and `privacy` keys (not in the schema; `additionalProperties: false` would reject the manifest at validation).
+- The CLI, MCP server, and Claude Code integrations are unaffected — this is purely a marketplace packaging change.
+
 ## [0.3.0] — 2026-05-25
 
 ### Added

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://cursor.com/schemas/cursor-plugin/plugin.json",
+  "name": "token-ops",
+  "displayName": "Token Ops: AI Token Saver",
+  "description": "Stop Cursor and Claude Code from wasting tokens on broad repo reads. Runs locally with no API key, account, or cloud backend.",
+  "version": "0.3.1",
+  "author": {
+    "name": "Maiko Kojima",
+    "email": "694169+maikoo811@users.noreply.github.com"
+  },
+  "publisher": "maikoo811",
+  "homepage": "https://github.com/maikoo811/token-ops",
+  "repository": "https://github.com/maikoo811/token-ops",
+  "license": "MIT",
+  "category": "developer-tools",
+  "keywords": [
+    "tokens",
+    "context",
+    "cursor",
+    "claude-code",
+    "mcp",
+    "vibe-coding"
+  ],
+  "tags": [
+    "tokens",
+    "context",
+    "mcp",
+    "productivity",
+    "agents"
+  ],
+  "rules": "./rules/",
+  "skills": "./skills/",
+  "commands": "./commands/",
+  "mcpServers": {
+    "token-ops": {
+      "command": "node",
+      "args": ["${PLUGIN_ROOT}/mcp/server.js"]
+    }
+  }
+}
