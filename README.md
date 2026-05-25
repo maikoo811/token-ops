@@ -168,6 +168,16 @@ token-ops install cursor
 token-ops install codex
 ```
 
+Remove the helpers if you want to clean up:
+
+```sh
+token-ops uninstall
+```
+
+`uninstall` is non-destructive: it only removes the files and JSON keys
+Token Ops added. Unrelated `.claude/settings.local.json` entries,
+`AGENTS.md` content, and `.cursor/rules` files are preserved.
+
 ## Local MCP Server
 
 For advanced users who want to wire Token Ops manually:

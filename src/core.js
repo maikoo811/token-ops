@@ -256,7 +256,12 @@ export function shouldInjectForPrompt(prompt) {
     return false;
   }
 
-  return /fix|bug|add|implement|refactor|test|review|debug|change|update|コード|実装|修正|追加|テスト|レビュー|改善|エラー|バグ|直|不具合|動かな|壊/i.test(prompt);
+  // English: require word boundaries so `fix` does not match `prefix`/`fixture`,
+  // and `add` does not match `address`. Japanese: word boundaries are unreliable
+  // around CJK characters, so match the substrings directly.
+  const englishHit = /\b(?:fix|bug|add|implement|refactor|test|review|debug|change|update)\b/i.test(prompt);
+  const japaneseHit = /コード|実装|修正|追加|テスト|レビュー|改善|エラー|バグ|直|不具合|動かな|壊/.test(prompt);
+  return englishHit || japaneseHit;
 }
 
 export function resolveLanguage(lang, task) {
@@ -339,7 +344,7 @@ function isTextFile(file) {
   return TEXT_EXTENSIONS.has(extension) || basename(file).startsWith(".");
 }
 
-function extractKeywords(task) {
+export function extractKeywords(task) {
   const words = (task.toLowerCase().match(/[a-z0-9_/-]{2,}|[\p{Script=Han}]{2,}|[\p{Script=Katakana}ー]{2,}/gu) || [])
     .map((word) => word.trim())
     .filter((word) => !STOP_WORDS.has(word));
@@ -485,7 +490,7 @@ function buildTokenBudget({ candidates, files, consideredFiles, cwd }) {
   };
 }
 
-function finalizeTokenBudget(budget, packTokens) {
+export function finalizeTokenBudget(budget, packTokens) {
   const savedTokens = Math.max(0, budget.selectedFullTokens - packTokens);
   const savedPercent = budget.selectedFullTokens > 0 ? Math.round((savedTokens / budget.selectedFullTokens) * 100) : 0;
   const repoSavedTokens = Math.max(0, budget.repoTokens - packTokens);
@@ -616,6 +621,6 @@ function languageFor(file) {
   return extension || "txt";
 }
 
-function estimateTokens(text) {
+export function estimateTokens(text) {
   return Math.ceil(text.length / 4);
 }

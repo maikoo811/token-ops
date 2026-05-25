@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export function installIntegration({ cwd, target, cliPath }) {
@@ -37,6 +37,134 @@ export function installIntegration({ cwd, target, cliPath }) {
   }
 
   return installed;
+}
+
+export function uninstallIntegration({ cwd, target }) {
+  const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex"]);
+
+  if (!validTargets.has(target)) {
+    throw new Error("uninstall target must be one of: all, claude, claude-hook, cursor, codex");
+  }
+
+  const removed = [];
+
+  if (target === "all" || target === "claude" || target === "claude-hook") {
+    const skillPath = join(cwd, ".claude", "skills", "token-ops", "SKILL.md");
+    if (existsSync(skillPath)) {
+      rmSync(skillPath);
+      tryRemoveEmptyDir(join(cwd, ".claude", "skills", "token-ops"));
+      tryRemoveEmptyDir(join(cwd, ".claude", "skills"));
+      removed.push(".claude/skills/token-ops/SKILL.md");
+    }
+  }
+
+  if (target === "all" || target === "claude-hook") {
+    const settingsPath = join(cwd, ".claude", "settings.local.json");
+    const settingsResult = stripTokenOpsHook(settingsPath);
+    if (settingsResult) {
+      removed.push(settingsResult);
+    }
+  }
+
+  if (target === "all" || target === "claude" || target === "claude-hook") {
+    tryRemoveEmptyDir(join(cwd, ".claude"));
+  }
+
+  if (target === "all" || target === "cursor") {
+    const rulePath = join(cwd, ".cursor", "rules", "token-ops.mdc");
+    if (existsSync(rulePath)) {
+      rmSync(rulePath);
+      tryRemoveEmptyDir(join(cwd, ".cursor", "rules"));
+      tryRemoveEmptyDir(join(cwd, ".cursor"));
+      removed.push(".cursor/rules/token-ops.mdc");
+    }
+  }
+
+  if (target === "all" || target === "codex") {
+    const agentsResult = stripTokenOpsAgentsBlock(join(cwd, "AGENTS.md"));
+    if (agentsResult) {
+      removed.push(agentsResult);
+    }
+  }
+
+  return removed;
+}
+
+function stripTokenOpsHook(settingsPath) {
+  if (!existsSync(settingsPath)) {
+    return null;
+  }
+
+  let settings;
+  try {
+    settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+  } catch {
+    throw new Error(`${settingsPath} is not valid JSON`);
+  }
+
+  const hooks = settings.hooks;
+  if (!hooks || !Array.isArray(hooks.UserPromptSubmit)) {
+    return null;
+  }
+
+  const filtered = hooks.UserPromptSubmit.filter((entry) => {
+    const list = Array.isArray(entry.hooks) ? entry.hooks : [];
+    return !list.some((item) => Array.isArray(item.args) && item.args.includes("claude-user-prompt-submit"));
+  });
+
+  if (filtered.length === hooks.UserPromptSubmit.length) {
+    return null;
+  }
+
+  if (filtered.length === 0) {
+    delete hooks.UserPromptSubmit;
+  } else {
+    hooks.UserPromptSubmit = filtered;
+  }
+
+  if (Object.keys(hooks).length === 0) {
+    delete settings.hooks;
+  }
+
+  if (Object.keys(settings).length === 0) {
+    rmSync(settingsPath);
+    return ".claude/settings.local.json (deleted)";
+  }
+
+  writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+  return ".claude/settings.local.json (token-ops hook removed)";
+}
+
+function stripTokenOpsAgentsBlock(path) {
+  if (!existsSync(path)) {
+    return null;
+  }
+
+  const current = readFileSync(path, "utf8");
+  if (!current.includes("<!-- token-ops:start -->")) {
+    return null;
+  }
+
+  const cleaned = current.replace(/\n*<!-- token-ops:start -->[\s\S]*?<!-- token-ops:end -->\n?/m, "");
+  const trimmed = cleaned.trim();
+
+  if (trimmed === "" || trimmed === "# Repository Instructions") {
+    rmSync(path);
+    return "AGENTS.md (deleted)";
+  }
+
+  writeFileSync(path, cleaned.endsWith("\n") ? cleaned : `${cleaned}\n`);
+  return "AGENTS.md (token-ops block removed)";
+}
+
+function tryRemoveEmptyDir(path) {
+  try {
+    if (existsSync(path) && readdirSync(path).length === 0) {
+      rmdirSync(path);
+    }
+  } catch {
+    // ignore — directory has other content or cannot be removed
+  }
 }
 
 export function renderClaudeSkill(cliPath) {

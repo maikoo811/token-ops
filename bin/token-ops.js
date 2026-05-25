@@ -17,7 +17,7 @@ import {
   shouldInjectForPrompt,
   toPositiveInt
 } from "../src/core.js";
-import { installIntegration } from "../src/integrations.js";
+import { installIntegration, uninstallIntegration } from "../src/integrations.js";
 
 const args = process.argv.slice(2);
 const command = args.shift();
@@ -35,6 +35,11 @@ try {
 
   if (command === "install") {
     runInstall(args);
+    process.exit(0);
+  }
+
+  if (command === "uninstall") {
+    runUninstall(args);
     process.exit(0);
   }
 
@@ -109,6 +114,26 @@ function runInstall(values) {
   });
 
   console.log(`Installed token-ops integration:\n${installed.map((file) => `- ${file}`).join("\n")}`);
+}
+
+function runUninstall(values) {
+  const target = values[0] || "all";
+  if (target === "-h" || target === "--help") {
+    printHelp();
+    return;
+  }
+
+  const removed = uninstallIntegration({
+    cwd: process.cwd(),
+    target
+  });
+
+  if (removed.length === 0) {
+    console.log("Nothing to uninstall (no token-ops integration files found).");
+    return;
+  }
+
+  console.log(`Uninstalled token-ops integration:\n${removed.map((file) => `- ${file}`).join("\n")}`);
 }
 
 function runHook(values) {
@@ -264,6 +289,11 @@ Usage:
   token-ops install claude-hook
   token-ops install cursor
   token-ops install codex
+  token-ops uninstall
+  token-ops uninstall claude
+  token-ops uninstall claude-hook
+  token-ops uninstall cursor
+  token-ops uninstall codex
   token-ops hook claude-user-prompt-submit
 
 Options:
