@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-export function installIntegration({ cwd, target, cliPath }) {
+export function installIntegration({ cwd, target, cliPath, triggerMode = "smart" }) {
   const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex"]);
 
   if (!validTargets.has(target)) {
@@ -20,7 +20,7 @@ export function installIntegration({ cwd, target, cliPath }) {
   if (target === "all" || target === "claude-hook") {
     const settingsPath = join(cwd, ".claude", "settings.local.json");
     mkdirSync(join(cwd, ".claude"), { recursive: true });
-    writeFileSync(settingsPath, renderClaudeHookSettings(settingsPath, cliPath));
+    writeFileSync(settingsPath, renderClaudeHookSettings(settingsPath, cliPath, triggerMode));
     installed.push(".claude/settings.local.json");
   }
 
@@ -220,15 +220,19 @@ Use that compact context first. Read additional files only when the pack is insu
 `;
 }
 
-function renderClaudeHookSettings(settingsPath, cliPath) {
+function renderClaudeHookSettings(settingsPath, cliPath, triggerMode = "smart") {
   const existing = readExistingSettings(settingsPath);
+  const args = [cliPath, "hook", "claude-user-prompt-submit"];
+  if (triggerMode && triggerMode !== "smart") {
+    args.push("--trigger-mode", triggerMode);
+  }
   const hook = {
     matcher: "",
     hooks: [
       {
         type: "command",
         command: "node",
-        args: [cliPath, "hook", "claude-user-prompt-submit"],
+        args,
         timeout: 10
       }
     ]

@@ -278,18 +278,35 @@ export function renderSavingsReport(report, lang = "en") {
   ].join("\n");
 }
 
-export function shouldInjectForPrompt(prompt) {
+export const TRIGGER_MODES = new Set(["smart", "aggressive"]);
+export const DEFAULT_TRIGGER_MODE = "smart";
+
+export function readTriggerMode(value) {
+  if (!TRIGGER_MODES.has(value)) {
+    throw new Error(`--trigger-mode must be one of: ${[...TRIGGER_MODES].join(", ")}`);
+  }
+  return value;
+}
+
+export function shouldInjectForPrompt(prompt, mode = DEFAULT_TRIGGER_MODE) {
+  // These two filters apply in every mode — short prompts can't usefully be
+  // packed, and self-referential prompts about Token Ops itself would loop.
   if (!prompt || prompt.length < 6) {
     return false;
   }
-
   if (prompt.includes("token-ops")) {
     return false;
   }
 
-  // English: require word boundaries so `fix` does not match `prefix`/`fixture`,
-  // and `add` does not match `address`. Japanese: word boundaries are unreliable
-  // around CJK characters, so match the substrings directly.
+  // aggressive: fire on any qualifying prompt (most automatic, fewer surprises
+  // for coding-only repos where almost every prompt is code-relevant).
+  if (mode === "aggressive") {
+    return true;
+  }
+
+  // smart (default): require a coding-related trigger word. English uses \b
+  // boundaries so `fix` does not match `prefix`/`fixture`, etc. Japanese keeps
+  // substring matching because \b is unreliable around CJK characters.
   const englishHit = /\b(?:fix|bug|add|implement|refactor|test|review|debug|change|update)\b/i.test(prompt);
   const japaneseHit = /コード|実装|修正|追加|テスト|レビュー|改善|エラー|バグ|直|不具合|動かな|壊/.test(prompt);
   return englishHit || japaneseHit;

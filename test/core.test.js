@@ -147,6 +147,22 @@ test("shouldInjectForPrompt: requires English word boundaries", () => {
   assert.equal(shouldInjectForPrompt("Run the test fixture"), true, "`test` standalone still triggers");
 });
 
+test("shouldInjectForPrompt: aggressive mode fires without trigger words", () => {
+  // Prompts that would be REJECTED in smart mode (no coding keywords)
+  assert.equal(shouldInjectForPrompt("How does this project work?", "aggressive"), true);
+  assert.equal(shouldInjectForPrompt("Explain the rationale here", "aggressive"), true);
+  assert.equal(shouldInjectForPrompt("どうやって動いているの", "aggressive"), true);
+  // Same in smart mode → false
+  assert.equal(shouldInjectForPrompt("How does this project work?", "smart"), false);
+  assert.equal(shouldInjectForPrompt("どうやって動いているの", "smart"), false);
+});
+
+test("shouldInjectForPrompt: aggressive mode still applies length + self-ref filters", () => {
+  assert.equal(shouldInjectForPrompt("ok", "aggressive"), false, "too short");
+  assert.equal(shouldInjectForPrompt("token-ops is great", "aggressive"), false, "self-reference");
+  assert.equal(shouldInjectForPrompt("", "aggressive"), false, "empty");
+});
+
 test("shouldInjectForPrompt: fires for natural Japanese requests", () => {
   assert.equal(shouldInjectForPrompt("バグを直して"), true);
   assert.equal(shouldInjectForPrompt("不具合の修正"), true);
