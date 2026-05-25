@@ -436,6 +436,37 @@ function runGit(args, cwd) {
   }
 }
 
+// Validate a cwd argument that came from an untrusted-ish source (MCP client
+// tool call, Claude Code hook stdin). Throws with a specific message on
+// failure so callers can pick their own policy:
+// - MCP tools: re-throw (the caller gets a JSON-RPC error)
+// - Claude Code hook: catch and fall back to process.cwd() to stay resilient
+//   to upstream workspace-detection bugs.
+export function validateCwd(raw) {
+  let resolved;
+  try {
+    resolved = realpathSync(raw);
+  } catch {
+    throw new Error(`cwd does not exist: ${raw}`);
+  }
+
+  if (!statSync(resolved).isDirectory()) {
+    throw new Error(`cwd is not a directory: ${raw}`);
+  }
+
+  try {
+    execFileSync("git", ["rev-parse", "--git-dir"], {
+      cwd: resolved,
+      stdio: ["ignore", "ignore", "ignore"],
+      timeout: GIT_TIMEOUT_MS
+    });
+  } catch {
+    throw new Error(`cwd is not a git repository: ${raw}`);
+  }
+
+  return resolved;
+}
+
 // Resolve `file` against `cwd`, follow symlinks, and verify the resolved
 // path stays inside the repository root. Returns the resolved absolute path,
 // or null if the file escapes the repo (e.g. via a tracked symlink to

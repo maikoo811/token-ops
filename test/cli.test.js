@@ -288,6 +288,56 @@ test("uninstall on a clean directory is a no-op with a helpful message", () => {
   assert.match(output, /Nothing to uninstall/);
 });
 
+test("claude prompt hook falls back gracefully when input.cwd is invalid", () => {
+  // A non-existent cwd in the hook payload — the hook should not crash;
+  // it should silently fall back to process.cwd() (this test's cwd, which
+  // IS a git repo: the token-ops repo itself).
+  const output = execFileSync(
+    process.execPath,
+    [cli, "hook", "claude-user-prompt-submit"],
+    {
+      encoding: "utf8",
+      input: JSON.stringify({
+        cwd: "/this/path/definitely/does/not/exist",
+        prompt: "fix the bug in extractKeywords"
+      })
+    }
+  );
+
+  // Should be valid JSON — either {} or a hookSpecificOutput object.
+  const parsed = JSON.parse(output);
+  assert.ok(typeof parsed === "object", "hook must always emit a JSON object");
+  // The bogus cwd must NOT appear anywhere in the output.
+  assert.doesNotMatch(output, /\/this\/path\/definitely\/does\/not\/exist/);
+});
+
+test("claude prompt hook falls back gracefully when input.cwd is not a git repo", () => {
+  const nonGitDir = mkdtempSync(join(tmpdir(), "token-ops-hook-nogit-"));
+  writeFileSync(join(nonGitDir, "README.md"), "# just a directory, not a git repo\n");
+
+  const output = execFileSync(
+    process.execPath,
+    [cli, "hook", "claude-user-prompt-submit"],
+    {
+      encoding: "utf8",
+      input: JSON.stringify({
+        cwd: nonGitDir,
+        prompt: "fix the bug in extractKeywords"
+      })
+    }
+  );
+
+  const parsed = JSON.parse(output);
+  assert.ok(typeof parsed === "object", "hook must always emit a JSON object");
+  // Whatever pack it produces, the non-git path must not be the reported root.
+  if (parsed.hookSpecificOutput) {
+    assert.doesNotMatch(
+      parsed.hookSpecificOutput.additionalContext,
+      new RegExp(nonGitDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    );
+  }
+});
+
 test("symlink to a file outside the repo is never included in the pack", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-symlink-"));
   execFileSync("git", ["init"], { cwd, stdio: "ignore" });
