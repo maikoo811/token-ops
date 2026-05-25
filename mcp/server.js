@@ -83,7 +83,7 @@ function route(method, params) {
       },
       serverInfo: {
         name: "token-ops",
-        version: "0.2.0"
+        version: "0.3.0"
       }
     };
   }
