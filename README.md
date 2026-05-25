@@ -4,6 +4,55 @@ Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Cla
 
 The product goal is simple: install once, vibe code normally, and see how much context the agent avoided.
 
+## Measured Savings
+
+Real numbers from running `token-ops pack` against this repository (17 tracked files, ~12,587 tokens of full-repo context):
+
+```mermaid
+---
+config:
+  xyChart:
+    width: 760
+    height: 320
+  themeVariables:
+    xyChart:
+      plotColorPalette: "#16a34a"
+---
+xychart-beta
+  title "Tokens saved per pack (vs whole-repo baseline, higher is better)"
+  x-axis ["Fix JA tokenizer", "Add uninstall", "Build pack"]
+  y-axis "Tokens saved" 0 --> 10000
+  bar [8628, 9511, 8728]
+```
+
+| Task | Pack size | Vs selected full files | Vs whole repo |
+|---|---|---|---|
+| `Fix the Japanese keyword tokenizer in extractKeywords` | ~3,959 tokens | 56% smaller | 69% smaller |
+| `Add an uninstall command to the CLI` | ~3,076 tokens | 33% smaller | 76% smaller |
+| `Build a compact context pack for the current task` | ~3,859 tokens | 28% smaller | 69% smaller |
+
+A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pack.md) so you can see exactly what Token Ops produces.
+
+### What "saved" actually measures
+
+- **Pack size** is real bytes counted at `length / 4` (a rough token estimate).
+- **Vs selected full files** compares the pack against reading the same ranked files in full.
+- **Vs whole repo** compares against reading every tracked text file. This is an upper bound — a real agent wouldn't read everything, so treat this number as a ceiling, not a typical baseline.
+
+What this does NOT measure: whether the pack contained the right context, or how many follow-up reads the agent makes. Token Ops earns its keep when its snippets are sufficient for the task; it does not stop the agent from reading more when needed.
+
+### Verify these numbers yourself
+
+Inside this repository:
+
+```sh
+npm install
+npm test
+node bin/token-ops.js pack "Fix the Japanese keyword tokenizer in extractKeywords"
+```
+
+The `## Token Budget` section of the output is the source of the table above.
+
 ## Beginner Defaults
 
 Token Ops is designed to be useful without setup:
