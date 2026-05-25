@@ -46,16 +46,29 @@ test("extractKeywords: returns at most 20 unique keywords", () => {
 
 // ---- estimateTokens ----
 
-test("estimateTokens: rounds up to the nearest token", () => {
+test("estimateTokens: rounds up to the nearest token (ASCII)", () => {
   assert.equal(estimateTokens(""), 0);
   assert.equal(estimateTokens("a"), 1);
   assert.equal(estimateTokens("abcd"), 1);
   assert.equal(estimateTokens("abcde"), 2);
 });
 
-test("estimateTokens: scales linearly with byte length", () => {
+test("estimateTokens: ASCII scales at ~1 token per 4 chars", () => {
   const text = "x".repeat(400);
   assert.equal(estimateTokens(text), 100);
+});
+
+test("estimateTokens: Japanese is denser than ASCII (~1 token per 1.5 chars)", () => {
+  // 6 Japanese chars under the old 1/4 heuristic = ceil(6/4) = 2.
+  // New heuristic counts CJK at 1/1.5, so 6 chars = ceil(4) = 4.
+  assert.equal(estimateTokens("バグを直して"), 4);
+  // 60 Japanese chars under old = ceil(60/4) = 15; under new = ceil(60/1.5) = 40.
+  assert.equal(estimateTokens("あ".repeat(60)), 40);
+});
+
+test("estimateTokens: mixed-script text sums per-script estimates", () => {
+  // "Fix バグ" = 4 ASCII + 1 space + 2 JA. Old: ceil(7/4) = 2. New: ceil(5/4 + 2/1.5) = ceil(1.25 + 1.33) = 3.
+  assert.equal(estimateTokens("Fix バグ"), 3);
 });
 
 // ---- finalizeTokenBudget ----

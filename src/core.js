@@ -622,5 +622,16 @@ function languageFor(file) {
 }
 
 export function estimateTokens(text) {
-  return Math.ceil(text.length / 4);
+  if (!text) {
+    return 0;
+  }
+
+  // BPE tokenizers split CJK far more aggressively than they split ASCII
+  // (roughly 1 token per 1–2 CJK chars vs 1 token per ~4 ASCII chars).
+  // Counting Japanese chars separately keeps mixed-language estimates
+  // closer to reality than a single `length / 4` heuristic.
+  const japaneseMatches = text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu);
+  const japanese = japaneseMatches ? japaneseMatches.length : 0;
+  const other = text.length - japanese;
+  return Math.ceil(japanese / 1.5 + other / 4);
 }

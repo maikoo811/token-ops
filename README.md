@@ -6,7 +6,7 @@ The product goal is simple: install once, vibe code normally, and see how much c
 
 ## Measured Savings
 
-Real numbers from running `token-ops pack` against this repository (17 tracked files, ~12,587 tokens of full-repo context):
+Real numbers from running `token-ops pack` against this repository (19 tracked files, ~20,780 tokens of full-repo context, script-aware estimator):
 
 ```mermaid
 ---
@@ -21,21 +21,21 @@ config:
 xychart-beta
   title "Tokens saved per pack (vs whole-repo baseline, higher is better)"
   x-axis ["Fix JA tokenizer", "Add uninstall", "Build pack"]
-  y-axis "Tokens saved" 0 --> 10000
-  bar [8628, 9511, 8728]
+  y-axis "Tokens saved" 0 --> 20000
+  bar [15811, 17607, 16127]
 ```
 
 | Task | Pack size | Vs selected full files | Vs whole repo |
 |---|---|---|---|
-| `Fix the Japanese keyword tokenizer in extractKeywords` | ~3,959 tokens | 56% smaller | 69% smaller |
-| `Add an uninstall command to the CLI` | ~3,076 tokens | 33% smaller | 76% smaller |
-| `Build a compact context pack for the current task` | ~3,859 tokens | 28% smaller | 69% smaller |
+| `Fix the Japanese keyword tokenizer in extractKeywords` | ~4,969 tokens | 65% smaller | 76% smaller |
+| `Add an uninstall command to the CLI` | ~3,173 tokens | 63% smaller | 85% smaller |
+| `Build a compact context pack for the current task` | ~4,653 tokens | 68% smaller | 78% smaller |
 
 A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pack.md) so you can see exactly what Token Ops produces.
 
 ### What "saved" actually measures
 
-- **Pack size** is real bytes counted at `length / 4` (a rough token estimate).
+- **Pack size** is a rough token estimate: `length / 4` for ASCII and `length / 1.5` for CJK characters, summed. BPE tokenizers split CJK more aggressively than ASCII, so a single ratio underestimates Japanese-heavy content.
 - **Vs selected full files** compares the pack against reading the same ranked files in full.
 - **Vs whole repo** compares against reading every tracked text file. This is an upper bound — a real agent wouldn't read everything, so treat this number as a ceiling, not a typical baseline.
 
