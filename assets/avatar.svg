@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Token Ops</title>
+  <desc>Three stacked bars of decreasing length on a green background, representing context being compressed into a smaller pack.</desc>
+  <rect width="256" height="256" rx="56" ry="56" fill="#16a34a"/>
+  <rect x="48" y="78" width="160" height="20" rx="10" fill="#ffffff"/>
+  <rect x="48" y="118" width="120" height="20" rx="10" fill="#ffffff"/>
+  <rect x="48" y="158" width="64" height="20" rx="10" fill="#ffffff"/>
+</svg>

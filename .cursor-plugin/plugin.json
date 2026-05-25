@@ -12,6 +12,7 @@
   "homepage": "https://github.com/maikoo811/token-ops",
   "repository": "https://github.com/maikoo811/token-ops",
   "license": "MIT",
+  "logo": "assets/avatar.png",
   "category": "developer-tools",
   "keywords": [
     "tokens",
