@@ -6,7 +6,13 @@ The product goal is simple: install once, vibe code normally, and see how much c
 
 ## Measured Savings
 
-Real numbers from running `token-ops pack` against this repository (19 tracked files, ~20,780 tokens of full-repo context, script-aware estimator):
+This README, the v0.4.x release series, and the Cursor Marketplace submission package were all built in a single Claude Code session with the Token Ops `UserPromptSubmit` hook enabled in aggressive mode. The numbers below are computed from that session's `.token-ops/session.jsonl` by [`docs/session-stats.mjs`](docs/session-stats.mjs) — a zero-dependency script you can rerun against your own log.
+
+Token Ops generated **~71,000 tokens of packs** in place of **~288,000 tokens of would-be full reads of the same ranked files** — **~217,000 tokens avoided**, equivalent to **~$0.65 Sonnet 4.5** or **~$3.25 Opus 4.7** input cost at list prices.
+
+### By prompt type
+
+Prompt content is not disclosed — only the type of work each prompt represented. All numbers compare the generated pack against reading the same ranked files in full.
 
 ```mermaid
 ---
@@ -19,39 +25,38 @@ config:
       plotColorPalette: "#16a34a"
 ---
 xychart-beta
-  title "Tokens saved per pack (vs whole-repo baseline, higher is better)"
-  x-axis ["Fix JA tokenizer", "Add uninstall", "Build pack"]
-  y-axis "Tokens saved" 0 --> 20000
-  bar [15811, 17607, 16127]
+  title "Median tokens saved per prompt type (vs same files in full)"
+  x-axis ["Question", "General", "Bug fix", "Decision", "Diagnosis"]
+  y-axis "Tokens saved" 0 --> 15000
+  bar [9392, 12285, 4202, 5742, 5348]
 ```
 
-| Task | Pack size | Vs selected full files | Vs whole repo |
-|---|---|---|---|
-| `Fix the Japanese keyword tokenizer in extractKeywords` | ~4,969 tokens | 65% smaller | 76% smaller |
-| `Add an uninstall command to the CLI` | ~3,173 tokens | 63% smaller | 85% smaller |
-| `Build a compact context pack for the current task` | ~4,653 tokens | 68% smaller | 78% smaller |
+| Prompt type | Median pack | Median saved |
+|---|---|---|
+| Question / clarification | ~2,967 tokens | ~9,392 tokens |
+| General comments / feedback | ~3,789 tokens | ~12,285 tokens |
+| Bug fix / task request | ~906 tokens | ~4,202 tokens |
+| Decision / verification | ~2,032 tokens | ~5,742 tokens |
+| Diagnosis (pasted log) | ~2,926 tokens | ~5,348 tokens |
 
 A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pack.md) so you can see exactly what Token Ops produces.
 
-### What "saved" actually measures
+### What this measures (and what it doesn't)
 
-- **Pack size** is a rough token estimate: `length / 4` for ASCII and `length / 1.5` for CJK characters, summed. BPE tokenizers split CJK more aggressively than ASCII, so a single ratio underestimates Japanese-heavy content.
-- **Vs selected full files** compares the pack against reading the same ranked files in full.
-- **Vs whole repo** compares against reading every tracked text file. This is an upper bound — a real agent wouldn't read everything, so treat this number as a ceiling, not a typical baseline.
+- **Saved** here means `(tokens of fully reading the ranked relevant files) − (tokens of the generated pack)`. It is the most directly comparable metric: it answers "if the agent had `Read` the same files Token Ops selected, instead of receiving snippets, how many more tokens of input would it have used?"
+- These numbers do **not** include tokens the agent reads in follow-up tool calls after receiving the pack. Token Ops front-loads relevant context; it does not prevent further reads when the snippets are insufficient. Real-world savings are at most the figures above and typically smaller.
+- Pack and file token counts are estimates: `length / 4` for ASCII and `length / 1.5` for CJK characters, summed. BPE tokenizers split CJK more aggressively than ASCII, so a single ratio underestimates Japanese-heavy content.
+- Per-type medians come from a small sample in a single session — treat them as ballpark sketches, not statistics. The aggregate (~217K tokens, ~$0.65 Sonnet) is the more stable number.
 
-What this does NOT measure: whether the pack contained the right context, or how many follow-up reads the agent makes. Token Ops earns its keep when its snippets are sufficient for the task; it does not stop the agent from reading more when needed.
+### Verify on your own session
 
-### Verify these numbers yourself
-
-Inside this repository:
+After installing the hook (`token-ops install claude-hook --trigger-mode aggressive`) and using Claude Code for a while, run:
 
 ```sh
-npm install
-npm test
-node bin/token-ops.js pack "Fix the Japanese keyword tokenizer in extractKeywords"
+node /path/to/token-ops/docs/session-stats.mjs
 ```
 
-The `## Token Budget` section of the output is the source of the table above.
+inside your project. It emits the same table from your own `.token-ops/session.jsonl`. No dependencies, Node 18+.
 
 ## Beginner Defaults
 

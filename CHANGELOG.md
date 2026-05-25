@@ -5,6 +5,16 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] — 2026-05-25
+
+### Changed
+- **README "Measured Savings" section is now driven by real session data** computed from `.token-ops/session.jsonl`, not synthetic benchmarks. Replaced the three hand-picked example tasks with a **prompt-type breakdown** (Question / General comments / Bug fix / Decision / Diagnosis) from the actual hook firings that built v0.4.x.
+- Switched the headline metric from the inflated whole-repo baseline (an upper bound a real agent would never hit) to **vs reading the same ranked files in full** (~$0.65 Sonnet 4.5 / ~$3.25 Opus 4.7 in this session at API list prices). The previous whole-repo framing contradicted the README's own caveat that whole-repo is a ceiling.
+- Prompt contents are no longer disclosed in the README — only the type of work each prompt represented — so the data stays useful without leaking session specifics.
+
+### Added
+- **`docs/session-stats.mjs`**: zero-dependency Node 18+ script that reads `.token-ops/session.jsonl` from the current working directory and emits the same prompt-type breakdown the README publishes (table + aggregate + Mermaid chart). Filters known test-fixture prompts (`fix the bug in extractKeywords`, etc.) so a contributor's `npm test` runs don't pollute their personal aggregate. Sort is count-desc across all categories — the catch-all "General comments / feedback" is a named first-class bucket, not an "Other" dump.
+
 ## [0.4.2] — 2026-05-25
 
 ### Changed
