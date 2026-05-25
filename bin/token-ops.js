@@ -31,7 +31,8 @@ import {
   renderSavingsReport,
   resolveLanguage,
   shouldInjectForPrompt,
-  toPositiveInt
+  toPositiveInt,
+  validateCwd
 } from "../src/core.js";
 import { installIntegration, uninstallIntegration } from "../src/integrations.js";
 
@@ -176,7 +177,23 @@ function runHook(values) {
 
   const input = readJsonFromStdin();
   const prompt = String(input.prompt || "").trim();
-  const hookCwd = String(input.cwd || process.cwd());
+  // input.cwd comes from Claude Code's stdin payload. In practice that's the
+  // editor itself, but treat it defensively so a bug in workspace detection
+  // (or a future client passing something weird) silently falls back to the
+  // server's process.cwd() instead of crashing the hook.
+  let hookCwd;
+  try {
+    hookCwd = validateCwd(String(input.cwd || process.cwd()));
+  } catch {
+    try {
+      hookCwd = validateCwd(process.cwd());
+    } catch {
+      // Even process.cwd() isn't a valid git repo (e.g. hook fired outside a
+      // repository entirely). Emit no additional context and exit cleanly.
+      process.stdout.write("{}");
+      return;
+    }
+  }
 
   if (!shouldInjectForPrompt(prompt, triggerMode)) {
     process.stdout.write("{}");

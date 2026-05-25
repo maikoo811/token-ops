@@ -5,6 +5,17 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] — 2026-05-25
+
+### Changed
+- **Shared `validateCwd` helper**: extracted cwd validation (realpathSync → directory check → `git rev-parse --git-dir`) from `mcp/server.js` into `src/core.js` as a new exported `validateCwd(raw)`. The MCP server (`readCwd`) and the Claude Code hook (`runHook`) now share the same implementation. The hook wraps it with a defensive fallback to `process.cwd()` so a bogus `input.cwd` from upstream never crashes the hook — if even that fails, the hook silently emits `{}` and exits clean. Acted on a Clearline reviewer recommendation; rated by them as HIGH but realistically a MED-tier defensive refactor (the hook's stdin comes from Claude Code itself, not an external attacker).
+
+### Tests
+- `claude prompt hook falls back gracefully when input.cwd is invalid` — non-existent path
+- `claude prompt hook falls back gracefully when input.cwd is not a git repo` — non-git directory
+
+Total: 51/51 passing.
+
 ## [0.4.1] — 2026-05-25
 
 Tier-1 hardening based on a follow-up Clearline review. Five small, focused fixes — no behavior change for the typical user.

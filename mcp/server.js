@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
-import { execFileSync } from "node:child_process";
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -11,7 +10,8 @@ import {
   readSavingsReport,
   recordSessionEvent,
   renderSavingsReport,
-  resolveLanguage
+  resolveLanguage,
+  validateCwd
 } from "../src/core.js";
 
 // Structured stderr logger: keeps the [token-ops-mcp] prefix that operators
@@ -225,32 +225,8 @@ function dispatchTool(name, args) {
 
 function readCwd(args) {
   const raw = String(args.cwd || process.cwd());
-
-  let resolved;
-  try {
-    resolved = realpathSync(raw);
-  } catch {
-    throw new Error(`cwd does not exist: ${raw}`);
-  }
-
-  if (!statSync(resolved).isDirectory()) {
-    throw new Error(`cwd is not a directory: ${raw}`);
-  }
-
-  // Require a git repo. Token Ops only ever enumerates git-tracked files, so
-  // pointing the server at /, /etc, or a non-repo can't yield meaningful work,
-  // and rejecting these paths up front prevents a malicious MCP client from
-  // using us as an arbitrary-filesystem-read primitive.
-  try {
-    execFileSync("git", ["rev-parse", "--git-dir"], {
-      cwd: resolved,
-      stdio: ["ignore", "ignore", "ignore"]
-    });
-  } catch {
-    throw new Error(`cwd is not a git repository: ${raw}`);
-  }
-
-  return resolved;
+  // MCP tools surface failures as JSON-RPC errors, so let validateCwd throw.
+  return validateCwd(raw);
 }
 
 function tools() {
