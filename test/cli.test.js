@@ -288,6 +288,32 @@ test("uninstall on a clean directory is a no-op with a helpful message", () => {
   assert.match(output, /Nothing to uninstall/);
 });
 
+test("symlink to a file outside the repo is never included in the pack", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-symlink-"));
+  execFileSync("git", ["init"], { cwd, stdio: "ignore" });
+  writeFileSync(join(cwd, "real.txt"), "this file is genuinely inside the repo\n");
+
+  // Create a separate file outside the repo that should NEVER appear in pack output.
+  const outsideDir = mkdtempSync(join(tmpdir(), "token-ops-outside-"));
+  const outsidePath = join(outsideDir, "SHOULD_NOT_LEAK.txt");
+  writeFileSync(outsidePath, "SUPER_SECRET_TOKEN_OPS_SENTINEL\n");
+
+  // Track the symlink inside the repo.
+  execFileSync("ln", ["-s", outsidePath, join(cwd, "leak.txt")]);
+  execFileSync("git", ["add", "-A"], { cwd });
+  execFileSync("git", ["-c", "user.email=t@e.com", "-c", "user.name=T", "commit", "-m", "init"], {
+    cwd,
+    stdio: "ignore"
+  });
+
+  const output = execFileSync(process.execPath, [cli, "pack", "find the secret"], {
+    cwd,
+    encoding: "utf8"
+  });
+
+  assert.doesNotMatch(output, /SUPER_SECRET_TOKEN_OPS_SENTINEL/, "symlink-followed content must not leak into pack");
+});
+
 test("prints high cost files as JSON", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-high-cost-"));
   execFileSync("git", ["init"], { cwd, stdio: "ignore" });

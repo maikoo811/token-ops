@@ -5,6 +5,31 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-05-25
+
+Tier-1 hardening based on a follow-up Clearline review. Five small, focused fixes — no behavior change for the typical user.
+
+### Added
+- **Symlink traversal guard**: new `safeAbsPath(cwd, file)` helper resolves real paths and rejects any tracked file whose resolved path escapes the repository root. Applied in `listTrackedFiles` so a malicious repo with a tracked symlink (e.g. `ln -s /etc/passwd secret.txt`) can never leak host-machine content into a context pack.
+- **`MAX_TRACKED_FILES = 50_000` ceiling**: `listTrackedFiles` truncates with a stderr warning on absurdly large repos so the tool stays responsive on 500k-file monorepos.
+- **`GIT_TIMEOUT_MS = 10_000`**: every `git` invocation now has a 10s timeout, preventing indefinite hangs on slow / network-mounted filesystems.
+- **MCP server in-flight cap** (`MAX_IN_FLIGHT = 3`): a misbehaving MCP client that loops `tools/call` can no longer saturate disk I/O — the 4th concurrent call is rejected with a clear error.
+- **Structured stderr logger** in `mcp/server.js`: all stderr output now follows `[token-ops-mcp] LEVEL ISO-TIMESTAMP message` so users filing bug reports can grep / awk for triage.
+
+### Documented
+- `trimSessionLog` now carries an explicit comment explaining the deliberate best-effort design (concurrent trims can drop a handful of recent lines; an explicit file lock would be heavier than the value justifies).
+
+### Tests
+- `symlink to a file outside the repo is never included in the pack` — full integration test that creates a real symlink to a temp file outside the repo, commits it, and asserts the secret content does not appear in pack output.
+- `MCP server stderr lines use the structured [token-ops-mcp] LEVEL ISO-TIMESTAMP format` — verifies the new logger contract.
+- Updated the existing error-handling test to match the new structured format.
+
+Total: 49/49 passing.
+
+### Deferred (Tier 2/3)
+- Absolute-path output: kept `Root: /Users/<user>/...` in pack output by default since it's actually useful debugging context. To revisit if enterprise users request opt-out.
+- File-token estimate cache: the reviewer downgraded this from MED to LOW; defer until a real user reports `pack` being slow on a large repo.
+
 ## [0.4.0] — 2026-05-25
 
 Marketplace-readiness hardening pass — based on an external code review (Clearline). Addresses one HIGH (security) and several MEDIUM/LOW items before Cursor Marketplace submission.

@@ -14,14 +14,21 @@ import {
   resolveLanguage
 } from "../src/core.js";
 
+// Structured stderr logger: keeps the [token-ops-mcp] prefix that operators
+// (and existing tests) grep for, but adds a level and ISO timestamp so logs
+// captured by Cursor / Claude Code are easy to triage.
+function log(level, message) {
+  process.stderr.write(`[token-ops-mcp] ${level} ${new Date().toISOString()} ${message}\n`);
+}
+
 // Surface crashes on stderr so Cursor / Claude Code can show a real error
 // instead of a silent "server in error state."
 process.on("uncaughtException", (err) => {
-  process.stderr.write(`[token-ops-mcp] uncaught exception: ${err.stack || err.message}\n`);
+  log("FATAL", `uncaught exception: ${err.stack || err.message}`);
   process.exit(1);
 });
 process.on("unhandledRejection", (reason) => {
-  process.stderr.write(`[token-ops-mcp] unhandled rejection: ${reason}\n`);
+  log("ERROR", `unhandled rejection: ${reason}`);
 });
 
 const PACKAGE_VERSION = (() => {
@@ -32,6 +39,12 @@ const PACKAGE_VERSION = (() => {
 
 const BEGINNER_MAX_FILES = 6;
 const BEGINNER_MAX_LINES = 80;
+
+// Cap concurrent tool calls. Each pack reads every tracked file in the repo;
+// a misbehaving MCP client looping requests could saturate disk I/O. Three
+// in-flight is generous for any sane client and prevents the runaway case.
+const MAX_IN_FLIGHT = 3;
+let inFlight = 0;
 
 // MCP stdio transport per the 2025 spec uses newline-delimited JSON:
 // each line on stdin is one complete JSON-RPC message, each response is
@@ -110,7 +123,7 @@ function handleMessage(raw) {
     const result = route(message.method, message.params || {});
     send({ jsonrpc: "2.0", id: message.id, result });
   } catch (error) {
-    process.stderr.write(`[token-ops-mcp] error handling ${message.method}: ${error.message}\n`);
+    log("ERROR", `error handling ${message.method}: ${error.message}`);
     send({
       jsonrpc: "2.0",
       id: message.id,
@@ -148,6 +161,18 @@ function route(method, params) {
 }
 
 function callTool(name, args) {
+  if (inFlight >= MAX_IN_FLIGHT) {
+    throw new Error(`Server busy — too many concurrent requests (limit ${MAX_IN_FLIGHT}). Try again shortly.`);
+  }
+  inFlight += 1;
+  try {
+    return dispatchTool(name, args);
+  } finally {
+    inFlight -= 1;
+  }
+}
+
+function dispatchTool(name, args) {
   if (name === "build_compact_context") {
     const cwd = readCwd(args);
     const task = String(args.task || "").trim();

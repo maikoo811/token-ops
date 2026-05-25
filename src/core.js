@@ -1,12 +1,21 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, extname, join, relative } from "node:path";
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { basename, extname, join, relative, sep } from "node:path";
 
 export const DEFAULT_MAX_FILES = 8;
 export const DEFAULT_MAX_LINES = 120;
 export const DEFAULT_CONTEXT = 8;
 export const MAX_FILE_BYTES = 220_000;
 export const DEFAULT_LANG = "auto";
+
+// Hard ceiling on the number of tracked files we will enumerate per call.
+// On 500k-file monorepos or slow network filesystems we'd otherwise spend
+// seconds-to-minutes inside git ls-files and the subsequent per-file reads.
+export const MAX_TRACKED_FILES = 50_000;
+// Timeout for every git invocation. Real local repos respond in <100ms;
+// 10 seconds is far beyond legitimate use and protects against hangs on
+// network-mounted or unresponsive filesystems.
+export const GIT_TIMEOUT_MS = 10_000;
 
 // Cap session.jsonl to avoid unbounded growth in aggressive hook mode.
 // Trimmed only when the size threshold is exceeded so normal usage pays
@@ -214,6 +223,15 @@ export function recordSessionEvent(cwd, event) {
   return path;
 }
 
+// Trimming is best-effort. Two processes (MCP server + CLI pack) can both
+// trigger this around the same instant and race on the read-then-write
+// cycle. We accept that: the worst case is one process's trim overwrites
+// the other's, dropping at most a handful of recent log lines. The data is
+// telemetry-grade ("how many tokens did we save"), not source of truth, and
+// adding a file lock would be a heavier dependency than the value justifies.
+// The catch deliberately swallows every sync throw — statSync, readFileSync,
+// and writeFileSync are the only operations and any failure (permission,
+// concurrent rename, disk full) should leave the calling pack/hook intact.
 function trimSessionLog(path) {
   try {
     const size = statSync(path).size;
@@ -227,7 +245,7 @@ function trimSessionLog(path) {
     const kept = lines.slice(-SESSION_LOG_KEEP_LINES);
     writeFileSync(path, `${kept.join("\n")}\n`);
   } catch {
-    // Trimming is best-effort; failures shouldn't break the calling pack/hook.
+    // intentionally silent (see comment above)
   }
 }
 
@@ -368,13 +386,20 @@ function hasJapanese(text) {
 
 function listTrackedFiles(cwd) {
   const output = runGit(["ls-files", "--cached", "--others", "--exclude-standard"], cwd);
-  return output
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
+  const allLines = output.split("\n").map((line) => line.trim()).filter(Boolean);
+
+  if (allLines.length > MAX_TRACKED_FILES) {
+    process.stderr.write(
+      `[token-ops] repository has ${allLines.length} tracked files; truncating to ${MAX_TRACKED_FILES} to avoid hangs.\n`
+    );
+  }
+
+  const lines = allLines.slice(0, MAX_TRACKED_FILES);
+  return lines
     .filter((file) => !shouldSkip(file))
     .filter((file) => existsSync(join(cwd, file)))
-    .filter((file) => isTextFile(file));
+    .filter((file) => isTextFile(file))
+    .filter((file) => safeAbsPath(cwd, file) !== null); // reject symlinks escaping cwd
 }
 
 function readGitState(cwd) {
@@ -400,10 +425,31 @@ function runGit(args, cwd) {
     return execFileSync("git", args, {
       cwd,
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: GIT_TIMEOUT_MS
     });
   } catch {
+    // Catches non-zero exit (e.g. not a git repo), timeout (ETIMEDOUT),
+    // and signal kills (SIGTERM after timeout). Returning empty is correct
+    // for all of them — callers gracefully degrade with no tracked files.
     return "";
+  }
+}
+
+// Resolve `file` against `cwd`, follow symlinks, and verify the resolved
+// path stays inside the repository root. Returns the resolved absolute path,
+// or null if the file escapes the repo (e.g. via a tracked symlink to
+// /etc/passwd) or cannot be resolved.
+function safeAbsPath(cwd, file) {
+  try {
+    const candidate = realpathSync(join(cwd, file));
+    const root = realpathSync(cwd);
+    if (candidate === root || candidate.startsWith(root + sep)) {
+      return candidate;
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
