@@ -6,11 +6,13 @@ import {
   DEFAULT_LANG,
   DEFAULT_MAX_FILES,
   DEFAULT_MAX_LINES,
+  DEFAULT_TRIGGER_MODE,
   estimateContextCost,
   generatePack,
   listHighCostFiles,
   readLanguage,
   readSavingsReport,
+  readTriggerMode,
   recordSessionEvent,
   renderSavingsReport,
   resolveLanguage,
@@ -107,10 +109,16 @@ function runInstall(values) {
     return;
   }
 
+  const triggerModeIndex = values.findIndex((value) => value === "--trigger-mode");
+  const triggerMode = triggerModeIndex >= 0
+    ? readTriggerMode(readOptionValue(values, triggerModeIndex + 1, "--trigger-mode"))
+    : DEFAULT_TRIGGER_MODE;
+
   const installed = installIntegration({
     cwd: process.cwd(),
     target,
-    cliPath: process.argv[1]
+    cliPath: process.argv[1],
+    triggerMode
   });
 
   console.log(`Installed token-ops integration:\n${installed.map((file) => `- ${file}`).join("\n")}`);
@@ -147,11 +155,16 @@ function runHook(values) {
     fail("hook target must be: claude-user-prompt-submit");
   }
 
+  const triggerModeIndex = values.findIndex((value) => value === "--trigger-mode");
+  const triggerMode = triggerModeIndex >= 0
+    ? readTriggerMode(readOptionValue(values, triggerModeIndex + 1, "--trigger-mode"))
+    : readTriggerMode(process.env.TOKEN_OPS_TRIGGER_MODE || DEFAULT_TRIGGER_MODE);
+
   const input = readJsonFromStdin();
   const prompt = String(input.prompt || "").trim();
   const hookCwd = String(input.cwd || process.cwd());
 
-  if (!shouldInjectForPrompt(prompt)) {
+  if (!shouldInjectForPrompt(prompt, triggerMode)) {
     process.stdout.write("{}");
     return;
   }
@@ -297,11 +310,14 @@ Usage:
   token-ops hook claude-user-prompt-submit
 
 Options:
-  -o, --output <file>     Write Markdown pack to a file
-  --max-files <number>   Number of relevant files to include (default: ${DEFAULT_MAX_FILES})
-  --max-lines <number>   Max snippet lines per file (default: ${DEFAULT_MAX_LINES})
-  --lang <auto|en|ja>     Output language for packs and reports (default: ${DEFAULT_LANG})
-  -h, --help             Show help
+  -o, --output <file>             Write Markdown pack to a file
+  --max-files <number>            Number of relevant files to include (default: ${DEFAULT_MAX_FILES})
+  --max-lines <number>            Max snippet lines per file (default: ${DEFAULT_MAX_LINES})
+  --lang <auto|en|ja>             Output language for packs and reports (default: ${DEFAULT_LANG})
+  --trigger-mode <smart|aggressive>  Hook firing policy. smart (default) requires a
+                                  coding keyword; aggressive fires on any prompt that
+                                  is at least 6 chars and not self-referential
+  -h, --help                      Show help
 `);
 }
 

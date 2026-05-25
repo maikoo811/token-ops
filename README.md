@@ -98,6 +98,56 @@ Which files are expensive for Cursor to read?
 - `list_high_cost_files`: find tracked files that are expensive to put in context
 - `report_saved_tokens`: show the local saved-token report
 
+## Levels of Automation
+
+Token Ops can run anywhere from "type a command every time" to "fires on every prompt automatically." Pick the level that matches the editor you use and how much per-project setup you want.
+
+| Level | Editor | Setup | What happens per prompt |
+|---|---|---|---|
+| **★★★★ Pre-injection** | Claude Code | `token-ops install claude-hook` (once per project) | A `UserPromptSubmit` hook **physically prepends** a compact pack to every prompt. Strongest guarantee — works even if the model would otherwise ignore the tool. Add `--trigger-mode aggressive` to fire on every prompt (≥ 6 chars, non self-referential); the default `smart` only fires on coding-keyword prompts. |
+| **★★★ One-click plugin** | Cursor (Marketplace) | One-click install once Token Ops is published to <https://cursor.com/marketplace> | Plugin bundles MCP server + `alwaysApply: true` rule. Agent is told to call `build_compact_context` first on every task. |
+| **★★ Global rule** | Cursor (any version) | Paste the rule below into `Cursor Settings → Rules → User Rules` once | Same agent-side instruction as the plugin path, applies to every project without per-project install. |
+| **★ Per-project rule** | Cursor | `token-ops install cursor` inside each project | Same rule, scoped to that project's `.cursor/rules/token-ops.mdc`. Use when you don't want a global default. |
+| **Manual** | Any editor | None | Type `Use build_compact_context for: <task>` in chat each time. Fine for trying things out. |
+
+### Picking a level
+
+- **You only use Claude Code** → Level ★★★★. Strongest, simplest.
+- **You only use Cursor** → Wait for ★★★ Marketplace install (one click), or do ★★ now (paste once).
+- **Mixed editors** → ★★★★ for Claude Code, ★★ for Cursor.
+- **One-off trial in a single repo** → Manual or ★.
+
+### Global Cursor rule (copy-paste)
+
+For Level ★★, paste this into `Cursor Settings → Rules → User Rules`:
+
+```
+Before broad repository exploration, large file reads, or noisy test-log analysis, use Token Ops if its MCP tools are available.
+
+Prefer this order:
+1. Call build_compact_context for the current task.
+2. Use the returned snippets and token budget before reading more files.
+3. Call list_high_cost_files before opening large files, generated files, lockfiles, or logs.
+4. Call report_saved_tokens when the user asks about cost, tokens, usage, or savings.
+
+Avoid reading broad repository context until Token Ops output is insufficient for the task.
+```
+
+And add Token Ops as an MCP server in `~/.cursor/mcp.json` (one time):
+
+```json
+{
+  "mcpServers": {
+    "token-ops": {
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/token-ops/mcp/server.js"]
+    }
+  }
+}
+```
+
+> Use an absolute path to `node` — Cursor GUI subprocesses do not inherit nvm's `PATH`.
+
 ## CLI Install
 
 From this repository:

@@ -5,6 +5,14 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] — 2026-05-25
+
+### Added
+- `--trigger-mode <smart|aggressive>` flag on the Claude Code hook. `smart` (default) keeps the existing coding-keyword trigger; `aggressive` fires on any prompt that is ≥ 6 chars and not self-referential. `install claude-hook --trigger-mode aggressive` bakes the flag into `.claude/settings.local.json`. Also honors the `TOKEN_OPS_TRIGGER_MODE` env var.
+
+### Why
+Trigger-word filtering was missing many coding-relevant prompts that happened not to contain `fix` / `bug` / 修正 / etc. Coding-only repos benefit from firing the hook on every qualifying prompt; mixed-use repos can stay on `smart` to avoid hook injection on chit-chat.
+
 ## [0.3.3] — 2026-05-25
 
 ### Fixed
