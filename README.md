@@ -13,18 +13,16 @@ Real numbers from running `token-ops pack` against this repository (17 tracked f
 config:
   xyChart:
     width: 760
-    height: 360
+    height: 320
   themeVariables:
     xyChart:
-      plotColorPalette: "#4f46e5, #94a3b8, #cbd5e1"
+      plotColorPalette: "#16a34a"
 ---
 xychart-beta
-  title "Token cost per task — pack vs baselines (lower is better)"
+  title "Tokens saved per pack (vs whole-repo baseline, higher is better)"
   x-axis ["Fix JA tokenizer", "Add uninstall", "Build pack"]
-  y-axis "Tokens" 0 --> 14000
-  bar "Token Ops pack" [3959, 3076, 3859]
-  bar "Selected files (full read)" [9078, 4588, 5369]
-  bar "Whole repo (upper bound)" [12587, 12587, 12587]
+  y-axis "Tokens saved" 0 --> 10000
+  bar [8628, 9511, 8728]
 ```
 
 | Task | Pack size | Vs selected full files | Vs whole repo |
