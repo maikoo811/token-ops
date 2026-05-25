@@ -2,11 +2,11 @@
 
 Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Claude Code, Codex, and other MCP-compatible agents a compact task-focused context pack before they read broadly, then records an estimated saved-token report.
 
-The product goal is simple: install once, vibe code normally, and see how much context the agent avoided.
+The product goal is simple: install once, vibe code normally, and see how much context the agent avoided. No API key, no account, no cloud backend, no telemetry by default.
 
 ## Measured Savings
 
-This README, the v0.4.x release series, and the Cursor Marketplace submission package were all built in a single Claude Code session with the Token Ops `UserPromptSubmit` hook enabled in aggressive mode. The numbers below are computed from that session's `.token-ops/session.jsonl` by [`docs/session-stats.mjs`](docs/session-stats.mjs) — a zero-dependency script you can rerun against your own log.
+The numbers below come from a single Claude Code session in which Token Ops was actually running while this project itself was being built. They are computed from the session's `.token-ops/session.jsonl` by [`docs/session-stats.mjs`](docs/session-stats.mjs) — a zero-dependency script you can rerun against your own log.
 
 Token Ops generated **~71,000 tokens of packs** in place of **~288,000 tokens of would-be full reads of the same ranked files** — **~217,000 tokens avoided**, equivalent to **~$0.65 Sonnet 4.5** or **~$3.25 Opus 4.7** input cost at list prices.
 
@@ -47,54 +47,15 @@ A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pa
 - These numbers do **not** include tokens the agent reads in follow-up tool calls after receiving the pack. Token Ops front-loads relevant context; it does not prevent further reads when the snippets are insufficient. Real-world savings are at most the figures above and typically smaller.
 - Pack and file token counts are estimates: `length / 4` for ASCII and `length / 1.5` for CJK characters, summed. BPE tokenizers split CJK more aggressively than ASCII, so a single ratio underestimates Japanese-heavy content.
 - Per-type medians come from a small sample in a single session — treat them as ballpark sketches, not statistics. The aggregate (~217K tokens, ~$0.65 Sonnet) is the more stable number.
+- Token Ops only **adds** context to the agent's prompt — it never removes the agent's other tools. If the pack is irrelevant or insufficient, the agent falls back to its normal Read / Grep workflow. Accuracy is preserved; only the "wander to find the right file" cost goes down.
 
 ### Verify on your own session
 
-After installing the hook (`token-ops install claude-hook --trigger-mode aggressive`) and using Claude Code for a while, run:
-
-```sh
-node /path/to/token-ops/docs/session-stats.mjs
-```
-
-inside your project. It emits the same table from your own `.token-ops/session.jsonl`. No dependencies, Node 18+.
-
-## Beginner Defaults
-
-Token Ops is designed to be useful without setup:
-
-- No API key
-- No account
-- No cloud backend
-- No telemetry by default
-- Local MCP server
-- Beginner defaults: 6 files, 80 snippet lines per file, auto language
+After installing the hook and using Claude Code for a while, see [**Your savings log**](#your-savings-log) for how to inspect your own data.
 
 ## Cursor Plugin
 
-Token Ops is being shaped for Cursor Marketplace distribution as a free local plugin.
-
-The plugin includes:
-
-- A local MCP server: `mcp/server.js`
-- Cursor rules: `rules/token-ops.mdc`
-- A Token Ops skill: `skills/token-ops/SKILL.md`
-- Commands for compact context and saved-token reports
-
-The MCP server runs locally. It does not require a hosted backend or a Token Ops account.
-
-After installation, users can ask Cursor:
-
-```text
-Show my Token Ops savings report.
-```
-
-```text
-Use Token Ops before changing this code.
-```
-
-```text
-Which files are expensive for Cursor to read?
-```
+Distributed via the [Cursor Marketplace](https://cursor.com/marketplace). Bundles the MCP server, an `alwaysApply: true` rule that nudges the agent to use `build_compact_context` first, and the four tools listed below. See **Levels of Automation** for setup options.
 
 ## MCP Tools
 
@@ -172,76 +133,86 @@ npx . pack "Fix the CSV import bug"
 Inside any git project:
 
 ```sh
-token-ops pack "Fix the CSV import bug"
+token-ops pack "Fix the CSV import bug"   # generate a context pack
+token-ops report                          # show the cumulative saved-token report
 ```
 
-Write the pack to a file:
+Run `token-ops --help` for the full command list (`cost`, `high-cost-files`, `install`, `uninstall`, `hook`).
+
+## One-command Editor Setup
+
+Inside the project you want Token Ops in:
 
 ```sh
-token-ops pack "Improve auth error handling" -o context-pack.md
+token-ops install                                          # all editors (Claude, Cursor, Codex)
+token-ops install claude-hook --trigger-mode aggressive    # Claude Code only, fires on every prompt
+token-ops uninstall                                        # clean removal
 ```
 
-Show the saved-token report:
+`uninstall` is non-destructive: it only removes the files and JSON keys Token Ops added. Unrelated `.claude/settings.local.json` entries, `AGENTS.md` content, and `.cursor/rules` files are preserved. Run `token-ops install --help` for the full list of targets.
+
+## Your savings log
+
+Every pack Token Ops generates is appended to `.token-ops/session.jsonl` inside the project. Two ways to inspect it:
+
+### Quick CLI summary
 
 ```sh
 token-ops report
 ```
 
-Find large tracked text files:
+Sample output:
 
-```sh
-token-ops high-cost-files --limit 12
+```
+# Token Ops Savings Report
+
+- Runs: 59
+- Estimated saved: ~455,125 tokens
+- Generated packs: ~186,663 tokens
+- Avoided vs selected full files: ~455,125 tokens
+- Avoided vs whole repo: ~1,451,779 tokens
+- Log: ./.token-ops/session.jsonl
 ```
 
-Estimate context cost for a task:
+### Detailed breakdown (prompt-type aggregation)
 
 ```sh
-token-ops cost "Add tests for billing webhooks"
+node /path/to/token-ops/docs/session-stats.mjs
 ```
 
-## One-command Editor Setup
+Sample output:
 
-Install project-local helpers:
+```
+## Aggregate
 
-```sh
-token-ops install
+- Hook firings: 35
+- Generated packs: ~97,000 tokens
+- Equivalent full reads of the same ranked files: ~406,000 tokens
+- Avoided: ~309,000 tokens
+- Approx Sonnet 4.5 input cost saved: ~$0.93
+- Approx Opus 4.7 input cost saved: ~$4.63
+
+## By prompt type (median per firing)
+| Prompt type | Median pack | Median saved |
+|---|---|---|
+| Question / clarification | ~2,967 tokens | ~9,392 tokens |
+| ... |
 ```
 
-This creates:
+The script is zero-dependency Node 18+. It filters known test-fixture prompts (so `npm test` runs don't pollute your aggregate) and writes nothing — read-only.
 
-- `.claude/skills/token-ops/SKILL.md`
-- `.claude/settings.local.json`
-- `.cursor/rules/token-ops.mdc`
-- `AGENTS.md`
+## Advanced
 
-Install only one integration:
+<details>
+<summary>Wire the MCP server manually</summary>
 
-```sh
-token-ops install claude
-token-ops install claude-hook
-token-ops install cursor
-token-ops install codex
-```
-
-Remove the helpers if you want to clean up:
-
-```sh
-token-ops uninstall
-```
-
-`uninstall` is non-destructive: it only removes the files and JSON keys
-Token Ops added. Unrelated `.claude/settings.local.json` entries,
-`AGENTS.md` content, and `.cursor/rules` files are preserved.
-
-## Local MCP Server
-
-For advanced users who want to wire Token Ops manually:
+For users who want to register Token Ops without going through `token-ops install`:
 
 ```sh
 token-ops-mcp
 ```
 
-The package also exposes the server at:
+Or run the server file directly:
 
 ```sh
 node mcp/server.js
@@ -260,15 +231,9 @@ Cursor-compatible local MCP template:
 }
 ```
 
-## What It Includes
+> Prefer an absolute path to the `node` binary if you use nvm — Cursor GUI subprocesses don't inherit shell `PATH`.
 
-Each context pack includes:
-
-- Git branch and changed files
-- Relevant files selected from task keywords
-- Snippets around keyword matches
-- Rough token estimates
-- Estimated saved tokens versus selected full files and whole-repo context
+</details>
 
 ## Roadmap
 
