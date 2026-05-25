@@ -8,6 +8,25 @@ The product goal is simple: install once, vibe code normally, and see how much c
 
 Real numbers from running `token-ops pack` against this repository (17 tracked files, ~12,587 tokens of full-repo context):
 
+```mermaid
+---
+config:
+  xyChart:
+    width: 760
+    height: 360
+  themeVariables:
+    xyChart:
+      plotColorPalette: "#4f46e5, #94a3b8, #cbd5e1"
+---
+xychart-beta
+  title "Token cost per task — pack vs baselines (lower is better)"
+  x-axis ["Fix JA tokenizer", "Add uninstall", "Build pack"]
+  y-axis "Tokens" 0 --> 14000
+  bar "Token Ops pack" [3959, 3076, 3859]
+  bar "Selected files (full read)" [9078, 4588, 5369]
+  bar "Whole repo (upper bound)" [12587, 12587, 12587]
+```
+
 | Task | Pack size | Vs selected full files | Vs whole repo |
 |---|---|---|---|
 | `Fix the Japanese keyword tokenizer in extractKeywords` | ~3,959 tokens | 56% smaller | 69% smaller |
