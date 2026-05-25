@@ -1,9 +1,16 @@
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
   extractKeywords,
   estimateTokens,
   finalizeTokenBudget,
+  recordSessionEvent,
+  SESSION_LOG_KEEP_LINES,
+  SESSION_LOG_MAX_BYTES,
   shouldInjectForPrompt,
   resolveLanguage
 } from "../src/core.js";
@@ -188,4 +195,48 @@ test("resolveLanguage: auto detects Japanese from task content", () => {
   assert.equal(resolveLanguage("auto", "バグを直して"), "ja");
   assert.equal(resolveLanguage("auto", "fix the bug"), "en");
   assert.equal(resolveLanguage("auto", ""), "en");
+});
+
+// ---- recordSessionEvent log rotation ----
+
+test("recordSessionEvent trims session.jsonl once it exceeds the size cap", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-log-rotate-"));
+  const path = join(cwd, ".token-ops", "session.jsonl");
+
+  // Pre-seed an oversized log with one record per line.
+  execFileSync(process.execPath, ["-e", `
+    const fs = require("fs");
+    const path = require("path");
+    fs.mkdirSync(path.join(${JSON.stringify(cwd)}, ".token-ops"), { recursive: true });
+    const lines = [];
+    const filler = "x".repeat(200);
+    for (let i = 0; i < ${SESSION_LOG_KEEP_LINES + 2_000}; i++) {
+      lines.push(JSON.stringify({ i, filler }));
+    }
+    fs.writeFileSync(path.join(${JSON.stringify(cwd)}, ".token-ops", "session.jsonl"), lines.join("\\n") + "\\n");
+  `]);
+
+  const sizeBefore = statSync(path).size;
+  assert.ok(sizeBefore > SESSION_LOG_MAX_BYTES, "test fixture should exceed the cap to exercise trimming");
+
+  // One more append triggers the trim pass.
+  recordSessionEvent(cwd, { type: "test", task: "trigger trim", budget: {} });
+
+  const after = readFileSync(path, "utf8").split("\n").filter(Boolean);
+  assert.ok(after.length <= SESSION_LOG_KEEP_LINES, `should keep at most ${SESSION_LOG_KEEP_LINES} lines, got ${after.length}`);
+  // The new event must still be present (it's the last line).
+  const last = JSON.parse(after[after.length - 1]);
+  assert.equal(last.task, "trigger trim");
+});
+
+test("recordSessionEvent does not rewrite the file when under the cap", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-log-small-"));
+  const path = join(cwd, ".token-ops", "session.jsonl");
+
+  recordSessionEvent(cwd, { type: "test", task: "first", budget: {} });
+  const firstSize = statSync(path).size;
+  recordSessionEvent(cwd, { type: "test", task: "second", budget: {} });
+  const secondSize = statSync(path).size;
+
+  assert.ok(secondSize > firstSize, "small logs should just append, not rotate");
 });

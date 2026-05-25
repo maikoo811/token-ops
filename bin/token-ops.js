@@ -1,5 +1,19 @@
 #!/usr/bin/env node
 
+// ESM imports below are hoisted, so this runs after them — but on Node 16/17
+// the imports themselves still succeed (basic ESM works since 14), so this
+// guard catches the most common "almost-supported but actually too old" case
+// and emits a readable upgrade message instead of letting the rest of the
+// code fail with a node:test or top-level-await error later.
+const NODE_MAJOR = Number.parseInt(process.versions.node.split(".")[0], 10);
+if (NODE_MAJOR < 18) {
+  process.stderr.write(
+    `token-ops requires Node.js 18 or later. You are running ${process.version}.\n` +
+      "Please upgrade: https://nodejs.org\n"
+  );
+  process.exit(1);
+}
+
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {

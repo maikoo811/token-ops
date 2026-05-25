@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, join, relative } from "node:path";
 
 export const DEFAULT_MAX_FILES = 8;
@@ -7,6 +7,12 @@ export const DEFAULT_MAX_LINES = 120;
 export const DEFAULT_CONTEXT = 8;
 export const MAX_FILE_BYTES = 220_000;
 export const DEFAULT_LANG = "auto";
+
+// Cap session.jsonl to avoid unbounded growth in aggressive hook mode.
+// Trimmed only when the size threshold is exceeded so normal usage pays
+// zero overhead per record.
+export const SESSION_LOG_MAX_BYTES = 2 * 1024 * 1024;
+export const SESSION_LOG_KEEP_LINES = 10_000;
 
 const STOP_WORDS = new Set([
   "the",
@@ -204,7 +210,25 @@ export function recordSessionEvent(cwd, event) {
     ...event
   };
   writeFileSync(path, `${JSON.stringify(payload)}\n`, { flag: "a" });
+  trimSessionLog(path);
   return path;
+}
+
+function trimSessionLog(path) {
+  try {
+    const size = statSync(path).size;
+    if (size <= SESSION_LOG_MAX_BYTES) {
+      return;
+    }
+    const lines = readFileSync(path, "utf8").split("\n").filter(Boolean);
+    if (lines.length <= SESSION_LOG_KEEP_LINES) {
+      return;
+    }
+    const kept = lines.slice(-SESSION_LOG_KEEP_LINES);
+    writeFileSync(path, `${kept.join("\n")}\n`);
+  } catch {
+    // Trimming is best-effort; failures shouldn't break the calling pack/hook.
+  }
 }
 
 export function readSavingsReport(cwd) {

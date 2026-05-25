@@ -1,6 +1,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+const GITIGNORE_MARKER = ".token-ops/";
+const GITIGNORE_BLOCK = "# Token Ops session log\n.token-ops/\n";
+
 export function installIntegration({ cwd, target, cliPath, triggerMode = "smart" }) {
   const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex"]);
 
@@ -36,7 +39,58 @@ export function installIntegration({ cwd, target, cliPath, triggerMode = "smart"
     installed.push("AGENTS.md");
   }
 
+  const gitignoreResult = ensureGitignoreEntry(join(cwd, ".gitignore"));
+  if (gitignoreResult) {
+    installed.push(gitignoreResult);
+  }
+
   return installed;
+}
+
+function ensureGitignoreEntry(gitignorePath) {
+  const existing = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
+  if (existing.includes(GITIGNORE_MARKER)) {
+    return null;
+  }
+
+  const separator = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
+  const blockPrefix = existing.length > 0 ? "\n" : "";
+  writeFileSync(gitignorePath, existing + separator + blockPrefix + GITIGNORE_BLOCK);
+  return existing.length === 0 ? ".gitignore (created)" : ".gitignore (.token-ops/ added)";
+}
+
+function removeGitignoreEntry(gitignorePath) {
+  if (!existsSync(gitignorePath)) {
+    return null;
+  }
+
+  const current = readFileSync(gitignorePath, "utf8");
+  if (!current.includes(GITIGNORE_MARKER)) {
+    return null;
+  }
+
+  // Strip our exact block (with surrounding blank lines) first; fall back to a
+  // line-by-line removal if a user edited the block manually.
+  let cleaned = current.replace(/\n*# Token Ops session log\n\.token-ops\/\n/g, "\n");
+  if (cleaned.includes(GITIGNORE_MARKER)) {
+    cleaned = cleaned
+      .split("\n")
+      .filter((line) => line.trim() !== ".token-ops/" && line.trim() !== "# Token Ops session log")
+      .join("\n");
+  }
+
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "");
+  if (!cleaned.endsWith("\n") && cleaned.length > 0) {
+    cleaned += "\n";
+  }
+
+  if (cleaned.trim().length === 0) {
+    rmSync(gitignorePath);
+    return ".gitignore (deleted)";
+  }
+
+  writeFileSync(gitignorePath, cleaned);
+  return ".gitignore (.token-ops/ removed)";
 }
 
 export function uninstallIntegration({ cwd, target }) {
@@ -84,6 +138,13 @@ export function uninstallIntegration({ cwd, target }) {
     const agentsResult = stripTokenOpsAgentsBlock(join(cwd, "AGENTS.md"));
     if (agentsResult) {
       removed.push(agentsResult);
+    }
+  }
+
+  if (target === "all") {
+    const gitignoreResult = removeGitignoreEntry(join(cwd, ".gitignore"));
+    if (gitignoreResult) {
+      removed.push(gitignoreResult);
     }
   }
 

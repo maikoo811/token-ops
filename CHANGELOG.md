@@ -5,6 +5,23 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-05-25
+
+Marketplace-readiness hardening pass — based on an external code review (Clearline). Addresses one HIGH (security) and several MEDIUM/LOW items before Cursor Marketplace submission.
+
+### Added
+- **`recordSessionEvent` log rotation**: `.token-ops/session.jsonl` is now capped at 2 MB. When the file exceeds the cap, it is rewritten keeping the last 10,000 entries. Trimming runs only after the append that crosses the threshold, so steady-state usage pays zero overhead.
+- **MCP server stderr diagnostics**: global `uncaughtException` / `unhandledRejection` handlers and a stderr write in the `handleMessage` catch block. Cursor / Claude Code now see a real error instead of a silent "server in error state."
+- **`.gitignore` auto-management**: `token-ops install` appends a `.token-ops/` entry to the project `.gitignore` (creating the file if missing); `token-ops uninstall` (all-target) removes the same block. Prevents accidental session-log commits.
+- **CLI Node.js version guard**: `bin/token-ops.js` exits with a readable upgrade message on Node < 18. `.npmrc` sets `engine-strict=true` so installs on unsupported Node also fail loudly.
+
+### Fixed
+- **MCP `cwd` validation (security)**: `readCwd` now resolves the incoming path with `realpathSync`, confirms it is a directory, and runs `git rev-parse --git-dir` to confirm it is a git repository. Prevents a malicious or misconfigured MCP client from pointing the server at `/etc`, `/`, or any other arbitrary location and using it as a filesystem-read primitive. The function still defaults to `process.cwd()` when the caller omits the field.
+- **MCP server hardcoded version**: the `initialize` response now reads the version from `package.json` at startup instead of a hardcoded string literal, so future releases no longer require touching `mcp/server.js`.
+
+### Tests
+- 9 new tests across `core.test.js`, `mcp.test.js`, and `cli.test.js` covering: log rotation behaviour (over-cap trim + under-cap append), MCP version dynamic read, cwd rejection (non-git / missing path), cwd acceptance (valid git repo), `.gitignore` create / preserve / uninstall round-trip. Total: 47/47 passing.
+
 ## [0.3.4] — 2026-05-25
 
 ### Added
