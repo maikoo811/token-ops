@@ -4,11 +4,36 @@ Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Cla
 
 The product goal is simple: install once, vibe code normally, and see how much context the agent avoided. No API key, no account, no cloud backend, no telemetry by default.
 
+## How it works
+
+When you ask an AI assistant about your code, it usually has to dig around your repo first — opening files, searching for keywords, reading more — before it can answer. That digging eats tokens.
+
+Token Ops does the digging up front. Every time you send a question:
+
+1. It looks at your project files
+2. Picks the ones most likely to matter for your question
+3. Pulls out just the relevant lines
+
+Then it hands those to the AI together with your question. The AI gets what it needs from the start — no wandering.
+
+```mermaid
+sequenceDiagram
+    participant U as You
+    participant T as Token Ops
+    participant A as AI
+    U->>T: "Fix the auth bug"
+    T->>T: find relevant files + key lines
+    T->>A: question + prepared context
+    A-->>U: answer
+```
+
+Same answer quality, fewer tokens. If the prepared context isn't enough, the AI can still look around — Token Ops only adds; it never blocks.
+
 ## Measured Savings
 
-The numbers below come from a single Claude Code session in which Token Ops was actually running while this project itself was being built. They are computed from the session's `.token-ops/session.jsonl` by [`docs/session-stats.mjs`](docs/session-stats.mjs) — a zero-dependency script you can rerun against your own log.
+These numbers are real — we measured them while building this project itself with Token Ops running. You can reproduce them on your own machine with [`docs/session-stats.mjs`](docs/session-stats.mjs) (zero dependencies).
 
-Token Ops generated **~71,000 tokens of packs** in place of **~288,000 tokens of would-be full reads of the same ranked files** — **~217,000 tokens avoided**, equivalent to **~$0.65 Sonnet 4.5** or **~$3.25 Opus 4.7** input cost at list prices.
+If the AI had read the relevant files in full, it would have used **~288,000 tokens**. Token Ops compressed those into **~71,000 tokens** — about **4× smaller**. That's **~217,000 tokens saved**, or **~$0.65 on Sonnet 4.5** / **~$3.25 on Opus 4.7** at API list prices.
 
 ### By prompt type
 
@@ -41,11 +66,11 @@ xychart-beta
 
 A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pack.md) so you can see exactly what Token Ops produces.
 
-### What this measures
+### What these numbers measure
 
-- **Saved** = tokens of fully reading the ranked files minus tokens of the generated pack. Real-world savings are **at most** this — the agent may still read more files after receiving the pack.
-- Token counts are estimates (`length / 4` for ASCII, `length / 1.5` for CJK); per-type figures come from a small single-session sample, the aggregate is the stable number.
-- Token Ops only **adds** context — it never removes the agent's other tools, so accuracy is preserved even when the pack misses.
+- **Upper bound, not guaranteed savings.** The AI might still read more files after the pack arrives. Real savings will be at most the figures above, often less.
+- **Rough estimates.** Token counts are approximated from character length. Per-prompt-type figures come from a small sample — trust the aggregate more than the breakdown.
+- **Quality is preserved.** Token Ops only *adds* context to the conversation. The AI keeps all its tools, so it can read more files when the pack doesn't cover everything.
 
 ### Verify on your own session
 
