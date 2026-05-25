@@ -70,7 +70,38 @@ const JA_TO_EN = new Map([
   ["監視", ["watch", "monitor", "observe"]],
   ["同期", ["sync"]],
   ["非同期", ["async"]],
-  ["並列", ["parallel", "concurrent"]]
+  ["並列", ["parallel", "concurrent"]],
+  // Project / repo structure
+  ["フォルダ", ["folder", "dir", "directory"]],
+  ["ディレクトリ", ["directory", "dir", "folder"]],
+  ["構造", ["structure", "layout", "architecture"]],
+  ["構成", ["structure", "layout", "config", "composition"]],
+  ["アーキテクチャ", ["architecture", "arch"]],
+  ["見直", ["review", "audit", "refactor"]],
+  ["整理", ["cleanup", "refactor", "reorganize"]],
+  ["リファクタ", ["refactor", "refactoring"]],
+  ["依存", ["dependency", "dependencies", "deps"]],
+  // Build / runtime
+  ["ビルド", ["build"]],
+  ["デプロイ", ["deploy", "deployment"]],
+  ["環境", ["environment", "env"]],
+  ["変数", ["variable", "var"]],
+  ["機能", ["feature", "function"]],
+  // UI / web
+  ["画面", ["page", "screen", "view"]],
+  ["ページ", ["page", "view", "route"]],
+  ["ルーティング", ["routing", "router", "route"]],
+  ["スタイル", ["style", "css", "theme"]],
+  ["状態", ["state", "store"]],
+  ["コンポーネント", ["component"]],
+  // Data
+  ["データベース", ["database", "db"]],
+  ["スキーマ", ["schema"]],
+  ["移行", ["migration", "migrate"]],
+  // Documentation / agents
+  ["ドキュメント", ["docs", "documentation", "readme"]],
+  ["エージェント", ["agent", "agents"]],
+  ["プロンプト", ["prompt"]]
 ]);
 
 const SKIP_DIRS = new Set([

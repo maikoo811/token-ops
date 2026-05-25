@@ -5,6 +5,15 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] — 2026-05-25
+
+### Added
+- Expanded JA→EN keyword bridge with ~25 high-frequency project / structure terms: フォルダ, ディレクトリ, 構造, 構成, アーキテクチャ, 見直, 整理, リファクタ, 依存, ビルド, デプロイ, 環境, 変数, 機能, 画面, ページ, ルーティング, スタイル, 状態, コンポーネント, データベース, スキーマ, 移行, ドキュメント, エージェント, プロンプト. Closes the gap exposed when running `pack "フォルダ構造を見直して"` and getting zero matches.
+- Regression test for the expanded bridge — a folder-structure prompt now matches a `folder-layout.md` file.
+
+### Fixed
+- Survey-style Japanese prompts ("フォルダ構造を見直して" etc.) previously returned 0 relevant files because the bridge missed `フォルダ` / `構造` / `見直し`. Now resolves to multiple structure/architecture/review files via the English equivalents.
+
 ## [0.3.1] — 2026-05-25
 
 ### Changed

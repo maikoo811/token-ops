@@ -95,6 +95,23 @@ test("splits Japanese prompts into per-word keywords, not one long blob", () => 
   assert.doesNotMatch(output, /`キーワード抽出のバグを直して`/);
 });
 
+test("bridges expanded JA terms (フォルダ構造見直し) to English file matches", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-ja-structure-"));
+  execFileSync("git", ["init"], { cwd, stdio: "ignore" });
+  writeFileSync(join(cwd, "folder-layout.md"), "# Folder layout\n\nOverview of the directory structure.\n");
+  writeFileSync(join(cwd, "unrelated.js"), "export const noop = () => {};\n");
+  execFileSync("git", ["add", "."], { cwd });
+  execFileSync("git", ["-c", "user.email=t@e.com", "-c", "user.name=T", "commit", "-m", "init"], { cwd, stdio: "ignore" });
+
+  const output = execFileSync(process.execPath, [cli, "pack", "フォルダ構造を見直して"], {
+    cwd,
+    encoding: "utf8"
+  });
+
+  const relevantSection = output.split(/##\s+関連ファイル/)[1] || "";
+  assert.match(relevantSection, /folder-layout\.md/, "folder/structure/review bridge should pick the folder-layout.md file");
+});
+
 test("bridges Japanese keywords to English file names during ranking", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-ja-bridge-"));
   execFileSync("git", ["init"], { cwd, stdio: "ignore" });
