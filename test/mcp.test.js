@@ -101,8 +101,9 @@ test("MCP server returns an error for unsupported methods", async () => {
   assert.equal(response.id, 7);
   assert.equal(response.error.code, -32603);
   assert.match(response.error.message, /Unsupported method/);
-  // Errors must be mirrored to stderr so Cursor can surface diagnostics.
-  assert.match(stderr, /\[token-ops-mcp\] error handling nonexistent\/method/);
+  // Errors must be mirrored to stderr so Cursor can surface diagnostics
+  // (structured format: [token-ops-mcp] LEVEL ISO-TIMESTAMP message).
+  assert.match(stderr, /\[token-ops-mcp\] ERROR .* error handling nonexistent\/method/);
 });
 
 test("MCP server reports its version from package.json (not a hardcoded literal)", async () => {
@@ -189,4 +190,16 @@ test("MCP server accepts a valid git-repo cwd", async () => {
 
   assert.ok(callResponse.result, "expected a successful result for a valid git repo");
   assert.match(callResponse.result.content[0].text, /Token Ops Context Pack/);
+});
+
+test("MCP server stderr lines use the structured [token-ops-mcp] LEVEL ISO-TIMESTAMP format", async () => {
+  const payload = `${JSON.stringify({
+    jsonrpc: "2.0",
+    id: 5,
+    method: "nonexistent/method",
+    params: {}
+  })}\n`;
+
+  const { stderr } = await runServer(payload);
+  assert.match(stderr, /\[token-ops-mcp\] ERROR \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z .*Unsupported method/);
 });
