@@ -1,9 +1,12 @@
-import { spawn } from "node:child_process";
-import { resolve } from "node:path";
+import { execFileSync, spawn } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 
 const server = resolve("mcp/server.js");
+const packageVersion = JSON.parse(readFileSync(resolve("package.json"), "utf8")).version;
 
 function runServer(stdinPayload, { timeoutMs = 3000 } = {}) {
   return new Promise((resolveFn, reject) => {
@@ -92,10 +95,98 @@ test("MCP server returns an error for unsupported methods", async () => {
     params: {}
   })}\n`;
 
-  const { stdout } = await runServer(payload);
+  const { stdout, stderr } = await runServer(payload);
   const response = JSON.parse(stdout.trim());
 
   assert.equal(response.id, 7);
   assert.equal(response.error.code, -32603);
   assert.match(response.error.message, /Unsupported method/);
+  // Errors must be mirrored to stderr so Cursor can surface diagnostics.
+  assert.match(stderr, /\[token-ops-mcp\] error handling nonexistent\/method/);
+});
+
+test("MCP server reports its version from package.json (not a hardcoded literal)", async () => {
+  const payload = `${JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: {}
+  })}\n`;
+
+  const { stdout } = await runServer(payload);
+  const response = JSON.parse(stdout.trim());
+
+  assert.equal(response.result.serverInfo.version, packageVersion);
+});
+
+test("MCP server rejects build_compact_context when cwd is not a git repo", async () => {
+  const tmp = mkdtempSync(join(tmpdir(), "token-ops-mcp-cwd-"));
+  writeFileSync(join(tmp, "README.md"), "# not a git repo\n");
+
+  const initLine = `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} })}\n`;
+  const callLine = `${JSON.stringify({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "tools/call",
+    params: {
+      name: "build_compact_context",
+      arguments: { task: "fix the bug", cwd: tmp }
+    }
+  })}\n`;
+
+  const { stdout } = await runServer(initLine + callLine);
+  const lines = stdout.trim().split("\n").map((line) => JSON.parse(line));
+  const callResponse = lines.find((line) => line.id === 2);
+
+  assert.ok(callResponse.error, "expected an error response for non-git cwd");
+  assert.match(callResponse.error.message, /not a git repository/);
+});
+
+test("MCP server rejects build_compact_context when cwd does not exist", async () => {
+  const initLine = `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} })}\n`;
+  const callLine = `${JSON.stringify({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "tools/call",
+    params: {
+      name: "build_compact_context",
+      arguments: { task: "fix the bug", cwd: "/this/path/definitely/does/not/exist" }
+    }
+  })}\n`;
+
+  const { stdout } = await runServer(initLine + callLine);
+  const lines = stdout.trim().split("\n").map((line) => JSON.parse(line));
+  const callResponse = lines.find((line) => line.id === 2);
+
+  assert.ok(callResponse.error, "expected an error response for missing cwd");
+  assert.match(callResponse.error.message, /cwd does not exist/);
+});
+
+test("MCP server accepts a valid git-repo cwd", async () => {
+  const tmp = mkdtempSync(join(tmpdir(), "token-ops-mcp-cwd-ok-"));
+  execFileSync("git", ["init"], { cwd: tmp, stdio: "ignore" });
+  writeFileSync(join(tmp, "README.md"), "# demo\n\nFix the bug.\n");
+  execFileSync("git", ["add", "."], { cwd: tmp });
+  execFileSync("git", ["-c", "user.email=t@e.com", "-c", "user.name=T", "commit", "-m", "init"], {
+    cwd: tmp,
+    stdio: "ignore"
+  });
+
+  const initLine = `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} })}\n`;
+  const callLine = `${JSON.stringify({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "tools/call",
+    params: {
+      name: "build_compact_context",
+      arguments: { task: "fix the bug", cwd: tmp }
+    }
+  })}\n`;
+
+  const { stdout } = await runServer(initLine + callLine);
+  const lines = stdout.trim().split("\n").map((line) => JSON.parse(line));
+  const callResponse = lines.find((line) => line.id === 2);
+
+  assert.ok(callResponse.result, "expected a successful result for a valid git repo");
+  assert.match(callResponse.result.content[0].text, /Token Ops Context Pack/);
 });

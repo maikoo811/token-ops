@@ -143,6 +143,39 @@ test("hook fires for natural Japanese bug-fix prompts", () => {
   assert.equal(shouldInjectForPrompt("token-opsを試す"), false);
 });
 
+test("install adds .token-ops/ to .gitignore (creating it if missing)", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-gitignore-new-"));
+  execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+  const contents = readFileSync(join(cwd, ".gitignore"), "utf8");
+  assert.match(contents, /\.token-ops\//);
+});
+
+test("install preserves existing .gitignore content and is idempotent", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-gitignore-merge-"));
+  writeFileSync(join(cwd, ".gitignore"), "node_modules/\nmy-secret.env\n");
+
+  execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+  execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+
+  const contents = readFileSync(join(cwd, ".gitignore"), "utf8");
+  assert.match(contents, /node_modules\//);
+  assert.match(contents, /my-secret\.env/);
+  const occurrences = (contents.match(/\.token-ops\//g) || []).length;
+  assert.equal(occurrences, 1, "second install should not duplicate the entry");
+});
+
+test("uninstall removes the .token-ops/ entry it added", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-gitignore-uninstall-"));
+  writeFileSync(join(cwd, ".gitignore"), "node_modules/\n");
+
+  execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+  execFileSync(process.execPath, [cli, "uninstall"], { cwd, encoding: "utf8" });
+
+  const contents = readFileSync(join(cwd, ".gitignore"), "utf8");
+  assert.match(contents, /node_modules\//);
+  assert.doesNotMatch(contents, /\.token-ops\//);
+});
+
 test("install claude-hook --trigger-mode aggressive bakes the flag into settings", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-trigger-mode-"));
 

@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+import { execFileSync } from "node:child_process";
+import { readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   estimateContextCost,
   generatePack,
@@ -9,6 +13,22 @@ import {
   renderSavingsReport,
   resolveLanguage
 } from "../src/core.js";
+
+// Surface crashes on stderr so Cursor / Claude Code can show a real error
+// instead of a silent "server in error state."
+process.on("uncaughtException", (err) => {
+  process.stderr.write(`[token-ops-mcp] uncaught exception: ${err.stack || err.message}\n`);
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  process.stderr.write(`[token-ops-mcp] unhandled rejection: ${reason}\n`);
+});
+
+const PACKAGE_VERSION = (() => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const pkgPath = join(here, "..", "package.json");
+  return JSON.parse(readFileSync(pkgPath, "utf8")).version;
+})();
 
 const BEGINNER_MAX_FILES = 6;
 const BEGINNER_MAX_LINES = 80;
@@ -90,6 +110,7 @@ function handleMessage(raw) {
     const result = route(message.method, message.params || {});
     send({ jsonrpc: "2.0", id: message.id, result });
   } catch (error) {
+    process.stderr.write(`[token-ops-mcp] error handling ${message.method}: ${error.message}\n`);
     send({
       jsonrpc: "2.0",
       id: message.id,
@@ -110,7 +131,7 @@ function route(method, params) {
       },
       serverInfo: {
         name: "token-ops",
-        version: "0.3.4"
+        version: PACKAGE_VERSION
       }
     };
   }
@@ -178,7 +199,33 @@ function callTool(name, args) {
 }
 
 function readCwd(args) {
-  return String(args.cwd || process.cwd());
+  const raw = String(args.cwd || process.cwd());
+
+  let resolved;
+  try {
+    resolved = realpathSync(raw);
+  } catch {
+    throw new Error(`cwd does not exist: ${raw}`);
+  }
+
+  if (!statSync(resolved).isDirectory()) {
+    throw new Error(`cwd is not a directory: ${raw}`);
+  }
+
+  // Require a git repo. Token Ops only ever enumerates git-tracked files, so
+  // pointing the server at /, /etc, or a non-repo can't yield meaningful work,
+  // and rejecting these paths up front prevents a malicious MCP client from
+  // using us as an arbitrary-filesystem-read primitive.
+  try {
+    execFileSync("git", ["rev-parse", "--git-dir"], {
+      cwd: resolved,
+      stdio: ["ignore", "ignore", "ignore"]
+    });
+  } catch {
+    throw new Error(`cwd is not a git repository: ${raw}`);
+  }
+
+  return resolved;
 }
 
 function tools() {
