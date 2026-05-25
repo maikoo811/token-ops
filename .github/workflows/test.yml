@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Least-privilege: this workflow only needs to read code to run tests.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
