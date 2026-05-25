@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -124,6 +124,66 @@ test("hook fires for natural Japanese bug-fix prompts", () => {
   assert.equal(shouldInjectForPrompt("壊れているので見て"), true);
   assert.equal(shouldInjectForPrompt("ok"), false);
   assert.equal(shouldInjectForPrompt("token-opsを試す"), false);
+});
+
+test("uninstall removes everything install created", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-uninstall-"));
+
+  execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+  assert.equal(existsSync(join(cwd, ".claude", "skills", "token-ops", "SKILL.md")), true);
+  assert.equal(existsSync(join(cwd, ".claude", "settings.local.json")), true);
+  assert.equal(existsSync(join(cwd, ".cursor", "rules", "token-ops.mdc")), true);
+  assert.equal(existsSync(join(cwd, "AGENTS.md")), true);
+
+  const output = execFileSync(process.execPath, [cli, "uninstall"], { cwd, encoding: "utf8" });
+
+  assert.match(output, /Uninstalled token-ops integration/);
+  assert.equal(existsSync(join(cwd, ".claude", "skills", "token-ops", "SKILL.md")), false);
+  assert.equal(existsSync(join(cwd, ".claude", "settings.local.json")), false);
+  assert.equal(existsSync(join(cwd, ".cursor", "rules", "token-ops.mdc")), false);
+  assert.equal(existsSync(join(cwd, "AGENTS.md")), false);
+});
+
+test("uninstall preserves unrelated settings.local.json hooks and AGENTS.md content", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-uninstall-preserve-"));
+
+  // Pre-existing user content that uninstall must NOT touch.
+  writeFileSync(
+    join(cwd, "AGENTS.md"),
+    "# Repository Instructions\n\n## Pre-existing\n\nKeep this paragraph.\n"
+  );
+
+  execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+
+  // Add an unrelated hook to settings.local.json that uninstall must NOT touch.
+  const settingsPath = join(cwd, ".claude", "settings.local.json");
+  const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+  settings.hooks.UserPromptSubmit.push({
+    matcher: "",
+    hooks: [{ type: "command", command: "echo", args: ["unrelated"], timeout: 5 }]
+  });
+  settings.permissions = { allow: ["Bash(ls)"] };
+  writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+
+  execFileSync(process.execPath, [cli, "uninstall"], { cwd, encoding: "utf8" });
+
+  // Settings file still exists with the unrelated hook + permissions intact.
+  assert.equal(existsSync(settingsPath), true);
+  const after = JSON.parse(readFileSync(settingsPath, "utf8"));
+  assert.equal(after.hooks.UserPromptSubmit.length, 1);
+  assert.deepEqual(after.hooks.UserPromptSubmit[0].hooks[0].args, ["unrelated"]);
+  assert.deepEqual(after.permissions, { allow: ["Bash(ls)"] });
+
+  // AGENTS.md preserved its pre-existing content; token-ops block removed.
+  const agents = readFileSync(join(cwd, "AGENTS.md"), "utf8");
+  assert.match(agents, /Keep this paragraph\./);
+  assert.doesNotMatch(agents, /token-ops:start/);
+});
+
+test("uninstall on a clean directory is a no-op with a helpful message", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-uninstall-noop-"));
+  const output = execFileSync(process.execPath, [cli, "uninstall"], { cwd, encoding: "utf8" });
+  assert.match(output, /Nothing to uninstall/);
 });
 
 test("prints high cost files as JSON", () => {
