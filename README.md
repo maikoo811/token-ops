@@ -41,13 +41,11 @@ xychart-beta
 
 A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pack.md) so you can see exactly what Token Ops produces.
 
-### What this measures (and what it doesn't)
+### What this measures
 
-- **Saved** here means `(tokens of fully reading the ranked relevant files) − (tokens of the generated pack)`. It is the most directly comparable metric: it answers "if the agent had `Read` the same files Token Ops selected, instead of receiving snippets, how many more tokens of input would it have used?"
-- These numbers do **not** include tokens the agent reads in follow-up tool calls after receiving the pack. Token Ops front-loads relevant context; it does not prevent further reads when the snippets are insufficient. Real-world savings are at most the figures above and typically smaller.
-- Pack and file token counts are estimates: `length / 4` for ASCII and `length / 1.5` for CJK characters, summed. BPE tokenizers split CJK more aggressively than ASCII, so a single ratio underestimates Japanese-heavy content.
-- Per-type medians come from a small sample in a single session — treat them as ballpark sketches, not statistics. The aggregate (~217K tokens, ~$0.65 Sonnet) is the more stable number.
-- Token Ops only **adds** context to the agent's prompt — it never removes the agent's other tools. If the pack is irrelevant or insufficient, the agent falls back to its normal Read / Grep workflow. Accuracy is preserved; only the "wander to find the right file" cost goes down.
+- **Saved** = tokens of fully reading the ranked files minus tokens of the generated pack. Real-world savings are **at most** this — the agent may still read more files after receiving the pack.
+- Token counts are estimates (`length / 4` for ASCII, `length / 1.5` for CJK); per-type figures come from a small single-session sample, the aggregate is the stable number.
+- Token Ops only **adds** context — it never removes the agent's other tools, so accuracy is preserved even when the pack misses.
 
 ### Verify on your own session
 
