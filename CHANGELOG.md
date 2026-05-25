@@ -5,6 +5,15 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] — 2026-05-25
+
+### Fixed
+- **MCP stdio framing**: the server previously used LSP-style `Content-Length` headers, which the modern MCP stdio spec replaced with newline-delimited JSON. Cursor 3.x couldn't talk to it — initialize would hang and the listing would show the server in an error state. The server now defaults to newline-delimited JSON-RPC and keeps Content-Length as a fallback for legacy clients.
+- Recommended user-level config in `~/.cursor/mcp.json` now uses the absolute path to the `node` binary instead of the bare `node` command, because Cursor GUI subprocesses do not inherit nvm's PATH modifications.
+
+### Added
+- `test/mcp.test.js`: 4 integration tests covering the MCP server's stdio framing (newline-delimited init, multi-message stream, Content-Length fallback, error response shape).
+
 ## [0.3.2] — 2026-05-25
 
 ### Added
