@@ -5,6 +5,15 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] — 2026-05-25
+
+### Changed
+- **README "Measured Savings" section is now driven by real session data**, not synthetic benchmarks. Replaced the three hand-picked example tasks with a **prompt-type breakdown** (Bug fix / Question / Decision / Diagnosis / Other) computed from the actual hook firings that built v0.4.x. Numbers: ~235K tokens avoided across 10 user prompts in a single development session (~$0.71 Sonnet / ~$3.53 Opus).
+- Prompt contents are no longer disclosed in the README — only the type of work each prompt represented — so the data stays useful without leaking session specifics.
+
+### Added
+- **`docs/session-stats.mjs`**: zero-dependency Node 18+ script that reads `.token-ops/session.jsonl` from the current working directory and emits the same prompt-type breakdown the README publishes. Run it in any project that has used Token Ops for a while to get reproducible per-type aggregates. Filters known test-fixture prompts (`fix the bug in extractKeywords`, etc.) so a contributor's `npm test` runs don't pollute their personal aggregate.
+
 ## [0.4.2] — 2026-05-25
 
 ### Changed
