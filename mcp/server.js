@@ -13,38 +13,65 @@ import {
 const BEGINNER_MAX_FILES = 6;
 const BEGINNER_MAX_LINES = 80;
 
-let buffer = Buffer.alloc(0);
+// MCP stdio transport per the 2025 spec uses newline-delimited JSON:
+// each line on stdin is one complete JSON-RPC message, each response is
+// a JSON object followed by "\n". We also tolerate the legacy LSP-style
+// Content-Length framing as a fallback so older clients still work.
+let buffer = "";
 
+process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
-  buffer = Buffer.concat([buffer, chunk]);
+  buffer += chunk;
   drainMessages();
 });
 
 function drainMessages() {
-  while (true) {
-    const headerEnd = buffer.indexOf("\r\n\r\n");
-    if (headerEnd < 0) {
-      return;
-    }
-
-    const header = buffer.subarray(0, headerEnd).toString("utf8");
-    const match = header.match(/Content-Length:\s*(\d+)/i);
-    if (!match) {
-      buffer = buffer.subarray(headerEnd + 4);
+  while (buffer.length > 0) {
+    if (buffer.startsWith("Content-Length:")) {
+      if (!drainContentLengthFramed()) {
+        return;
+      }
       continue;
     }
 
-    const length = Number(match[1]);
-    const messageStart = headerEnd + 4;
-    const messageEnd = messageStart + length;
-    if (buffer.length < messageEnd) {
+    const newlineIndex = buffer.indexOf("\n");
+    if (newlineIndex < 0) {
       return;
     }
 
-    const raw = buffer.subarray(messageStart, messageEnd).toString("utf8");
-    buffer = buffer.subarray(messageEnd);
-    handleMessage(raw);
+    const line = buffer.slice(0, newlineIndex).trim();
+    buffer = buffer.slice(newlineIndex + 1);
+    if (line.length === 0) {
+      continue;
+    }
+
+    handleMessage(line);
   }
+}
+
+function drainContentLengthFramed() {
+  const headerEnd = buffer.indexOf("\r\n\r\n");
+  if (headerEnd < 0) {
+    return false;
+  }
+
+  const header = buffer.slice(0, headerEnd);
+  const match = header.match(/Content-Length:\s*(\d+)/i);
+  if (!match) {
+    buffer = buffer.slice(headerEnd + 4);
+    return true;
+  }
+
+  const length = Number(match[1]);
+  const messageStart = headerEnd + 4;
+  if (buffer.length < messageStart + length) {
+    return false;
+  }
+
+  const raw = buffer.slice(messageStart, messageStart + length);
+  buffer = buffer.slice(messageStart + length);
+  handleMessage(raw);
+  return true;
 }
 
 function handleMessage(raw) {
@@ -83,7 +110,7 @@ function route(method, params) {
       },
       serverInfo: {
         name: "token-ops",
-        version: "0.3.2"
+        version: "0.3.3"
       }
     };
   }
@@ -220,6 +247,6 @@ function textResult(text) {
 }
 
 function send(message) {
-  const body = JSON.stringify(message);
-  process.stdout.write(`Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`);
+  // Per MCP stdio spec: each response is one JSON object on its own line.
+  process.stdout.write(`${JSON.stringify(message)}\n`);
 }
