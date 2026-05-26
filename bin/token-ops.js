@@ -137,6 +137,17 @@ function runInstall(values) {
   });
 
   console.log(`Installed token-ops integration:\n${installed.map((file) => `- ${file}`).join("\n")}`);
+
+  // Explain why settings.local.json is gitignored. It bakes in an absolute
+  // node path from process.argv[1] — sharing it via git breaks the config
+  // for anyone whose node lives at a different path and leaks the
+  // maintainer's username (e.g. /Users/<name>/.nvm/...) through the repo.
+  if (installed.includes(".claude/settings.local.json")) {
+    console.log(
+      "\nNote: .claude/settings.local.json was added to .gitignore — it contains an absolute\n" +
+      "      path to this machine's node binary and should stay local."
+    );
+  }
 }
 
 function runUninstall(values) {

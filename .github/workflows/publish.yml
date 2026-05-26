@@ -1,0 +1,42 @@
+name: publish
+
+# Publish to npm with sigstore provenance attestation. Provenance proves the
+# tarball was built from this exact workflow on this exact tag, mitigating
+# supply-chain attacks where an attacker would otherwise upload a poisoned
+# build under the same name/version.
+#
+# Trigger: push of a tag matching v*  (e.g. `git tag v0.4.5 && git push --tags`).
+# Prerequisite: repo secret `NPM_TOKEN` must hold an "Automation" token with
+# publish rights (Account → Access Tokens → Generate New Token → Automation).
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      # Least-privilege. id-token: write is required by sigstore so the
+      # workflow can mint a short-lived OIDC token at publish time.
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      # No `npm ci` step — token-ops has no production dependencies and the
+      # tarball is built from `files`/`exports` in package.json.
+
+      - name: Run tests on the tagged commit
+        run: npm test
+
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
