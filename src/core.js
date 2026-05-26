@@ -211,6 +211,13 @@ export function listHighCostFiles({ cwd, limit = 12 }) {
 }
 
 export function recordSessionEvent(cwd, event) {
+  // Opt-out for privacy-sensitive contexts (enterprise repos, prompts that
+  // may contain secrets / customer data). When set to "1", the session log
+  // is skipped entirely — token-ops report will show zero recorded events.
+  if (process.env.TOKEN_OPS_DISABLE_LOG === "1") {
+    return null;
+  }
+
   const dir = join(cwd, ".token-ops");
   mkdirSync(dir, { recursive: true });
   const path = join(dir, "session.jsonl");

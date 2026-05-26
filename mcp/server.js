@@ -46,6 +46,33 @@ const BEGINNER_MAX_LINES = 80;
 const MAX_IN_FLIGHT = 3;
 let inFlight = 0;
 
+// Hard caps on caller-supplied iteration bounds. Internal MAX_TRACKED_FILES
+// already protects against giant repos, but a misbehaving MCP client passing
+// e.g. maxFiles=10000 would still amplify per-file work (ranking, snippet
+// extraction, token estimation). Clamp here so the caller can't dictate
+// runaway iteration costs even within a single tools/call.
+const HARD_LIMIT_MAX_FILES = 50;
+const HARD_LIMIT_MAX_LINES = 300;
+const HARD_LIMIT_LIST_LIMIT = 200;
+
+function clampMaxFiles(raw, fallback) {
+  const n = Number(raw || fallback);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(n, HARD_LIMIT_MAX_FILES);
+}
+
+function clampMaxLines(raw, fallback) {
+  const n = Number(raw || fallback);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(n, HARD_LIMIT_MAX_LINES);
+}
+
+function clampListLimit(raw, fallback) {
+  const n = Number(raw || fallback);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(n, HARD_LIMIT_LIST_LIMIT);
+}
+
 // MCP stdio transport per the 2025 spec uses newline-delimited JSON:
 // each line on stdin is one complete JSON-RPC message, each response is
 // a JSON object followed by "\n". We also tolerate the legacy LSP-style
@@ -183,8 +210,8 @@ function dispatchTool(name, args) {
     const result = generatePack({
       task,
       cwd,
-      maxFiles: Number(args.maxFiles || BEGINNER_MAX_FILES),
-      maxLines: Number(args.maxLines || BEGINNER_MAX_LINES),
+      maxFiles: clampMaxFiles(args.maxFiles, BEGINNER_MAX_FILES),
+      maxLines: clampMaxLines(args.maxLines, BEGINNER_MAX_LINES),
       lang
     });
     recordSessionEvent(cwd, {
@@ -201,7 +228,7 @@ function dispatchTool(name, args) {
     const result = estimateContextCost({
       cwd: readCwd(args),
       task: String(args.task || ""),
-      maxFiles: Number(args.maxFiles || 8)
+      maxFiles: clampMaxFiles(args.maxFiles, 8)
     });
     return textResult(JSON.stringify(result, null, 2));
   }
@@ -209,7 +236,7 @@ function dispatchTool(name, args) {
   if (name === "list_high_cost_files") {
     const result = listHighCostFiles({
       cwd: readCwd(args),
-      limit: Number(args.limit || 12)
+      limit: clampListLimit(args.limit, 12)
     });
     return textResult(JSON.stringify(result, null, 2));
   }
