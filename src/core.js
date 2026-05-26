@@ -221,25 +221,43 @@ export function recordSessionEvent(cwd, event) {
   const dir = join(cwd, ".token-ops");
   mkdirSync(dir, { recursive: true });
   const path = join(dir, "session.jsonl");
+
+  // Symlink guard: if session.jsonl already exists and points outside cwd
+  // (e.g. attacker pre-planted a symlink to /etc/passwd or ~/.ssh/...),
+  // refuse to append. The first ever call creates a regular file, so this
+  // check skips the cold-start case where realpathSync would ENOENT.
+  if (existsSync(path) && safeAbsPath(cwd, join(".token-ops", "session.jsonl")) === null) {
+    return null;
+  }
+
   const payload = {
     timestamp: new Date().toISOString(),
     ...event
   };
   writeFileSync(path, `${JSON.stringify(payload)}\n`, { flag: "a" });
-  trimSessionLog(path);
+  trimSessionLog(cwd, path);
   return path;
 }
 
 // Trimming is best-effort. Two processes (MCP server + CLI pack) can both
 // trigger this around the same instant and race on the read-then-write
-// cycle. We accept that: the worst case is one process's trim overwrites
-// the other's, dropping at most a handful of recent log lines. The data is
-// telemetry-grade ("how many tokens did we save"), not source of truth, and
-// adding a file lock would be a heavier dependency than the value justifies.
+// cycle. Worst case: process A reads N lines, process B appends one more,
+// then process A overwrites with N kept lines — losing process B's single
+// most recently appended record. The data is telemetry-grade ("how many
+// tokens did we save"), not source of truth, and the next append self-heals
+// the log. Adding a file lock would be a heavier dependency than the value
+// justifies.
 // The catch deliberately swallows every sync throw — statSync, readFileSync,
 // and writeFileSync are the only operations and any failure (permission,
 // concurrent rename, disk full) should leave the calling pack/hook intact.
-function trimSessionLog(path) {
+function trimSessionLog(cwd, path) {
+  // Symlink guard: if session.jsonl has been replaced with a symlink that
+  // escapes the repo root, refuse to read or rewrite it. safeAbsPath returns
+  // null both on escape and on resolution failure, so the rare case where the
+  // file was unlinked between append and trim also bails out cleanly.
+  if (safeAbsPath(cwd, join(".token-ops", "session.jsonl")) === null) {
+    return;
+  }
   try {
     const size = statSync(path).size;
     if (size <= SESSION_LOG_MAX_BYTES) {
@@ -258,15 +276,22 @@ function trimSessionLog(path) {
 
 export function readSavingsReport(cwd) {
   const path = join(cwd, ".token-ops", "session.jsonl");
+  const zeroReport = {
+    events: 0,
+    savedTokens: 0,
+    packTokens: 0,
+    selectedFullTokens: 0,
+    repoSavedTokens: 0,
+    path
+  };
   if (!existsSync(path)) {
-    return {
-      events: 0,
-      savedTokens: 0,
-      packTokens: 0,
-      selectedFullTokens: 0,
-      repoSavedTokens: 0,
-      path
-    };
+    return zeroReport;
+  }
+  // Symlink guard: refuse to read session.jsonl if it resolves outside cwd.
+  // This catches a tracked / pre-planted symlink that would otherwise let
+  // `token-ops report` exfiltrate arbitrary host files.
+  if (safeAbsPath(cwd, join(".token-ops", "session.jsonl")) === null) {
+    return zeroReport;
   }
 
   const rows = readFileSync(path, "utf8")

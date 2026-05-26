@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir, platform } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -8,6 +8,7 @@ import {
   extractKeywords,
   estimateTokens,
   finalizeTokenBudget,
+  readSavingsReport,
   recordSessionEvent,
   SESSION_LOG_KEEP_LINES,
   SESSION_LOG_MAX_BYTES,
@@ -270,4 +271,61 @@ test("recordSessionEvent does not rewrite the file when under the cap", () => {
   const secondSize = statSync(path).size;
 
   assert.ok(secondSize > firstSize, "small logs should just append, not rotate");
+});
+
+// ---- symlink guards on session.jsonl ----
+// Windows symlink creation requires admin rights or developer mode, so skip
+// there. macOS/Linux runners (including CI) always pass.
+const skipSymlinkTests = platform() === "win32";
+
+test("readSavingsReport refuses to read session.jsonl when it's a symlink escaping cwd", { skip: skipSymlinkTests }, () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-symlink-read-"));
+  const external = mkdtempSync(join(tmpdir(), "token-ops-symlink-external-"));
+
+  // Plant a fake "session" outside the repo with attention-grabbing numbers
+  // that would clearly show up if the guard failed.
+  const externalLog = join(external, "evil-session.jsonl");
+  writeFileSync(
+    externalLog,
+    `${JSON.stringify({
+      type: "leaked",
+      task: "leaked",
+      budget: { savedTokens: 999_999, packTokens: 999_999 }
+    })}\n`
+  );
+
+  mkdirSync(join(cwd, ".token-ops"), { recursive: true });
+  symlinkSync(externalLog, join(cwd, ".token-ops", "session.jsonl"));
+
+  const report = readSavingsReport(cwd);
+  assert.equal(report.events, 0, "must not count records from a symlinked-external log");
+  assert.equal(report.savedTokens, 0, "must not surface savedTokens from outside cwd");
+  assert.equal(report.packTokens, 0);
+});
+
+test("recordSessionEvent refuses to append when session.jsonl is a symlink escaping cwd", { skip: skipSymlinkTests }, () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-symlink-write-"));
+  const external = mkdtempSync(join(tmpdir(), "token-ops-symlink-write-target-"));
+  const externalTarget = join(external, "victim.txt");
+  writeFileSync(externalTarget, "untouched\n");
+
+  mkdirSync(join(cwd, ".token-ops"), { recursive: true });
+  symlinkSync(externalTarget, join(cwd, ".token-ops", "session.jsonl"));
+
+  const result = recordSessionEvent(cwd, { type: "test", task: "should-not-write", budget: {} });
+  assert.equal(result, null, "recordSessionEvent must refuse and return null");
+
+  // The external file must be byte-identical to before — no append took place.
+  assert.equal(readFileSync(externalTarget, "utf8"), "untouched\n");
+});
+
+test("recordSessionEvent still works normally on a fresh (non-symlinked) repo", { skip: skipSymlinkTests }, () => {
+  // Regression guard: the new existsSync-before-realpath check must not
+  // accidentally reject the common cold-start case.
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-symlink-cold-"));
+  const result = recordSessionEvent(cwd, { type: "test", task: "first call", budget: {} });
+  assert.ok(result && result.endsWith("session.jsonl"));
+  // And a follow-up append on the now-regular file still works.
+  const second = recordSessionEvent(cwd, { type: "test", task: "second call", budget: {} });
+  assert.ok(second);
 });
