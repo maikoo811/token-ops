@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -227,6 +227,37 @@ test("recordSessionEvent trims session.jsonl once it exceeds the size cap", () =
   // The new event must still be present (it's the last line).
   const last = JSON.parse(after[after.length - 1]);
   assert.equal(last.task, "trigger trim");
+});
+
+test("recordSessionEvent is a no-op when TOKEN_OPS_DISABLE_LOG=1", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-disable-log-"));
+
+  const originalValue = process.env.TOKEN_OPS_DISABLE_LOG;
+  process.env.TOKEN_OPS_DISABLE_LOG = "1";
+  try {
+    const returnValue = recordSessionEvent(cwd, { type: "test", task: "should not be logged", budget: {} });
+    assert.equal(returnValue, null, "recordSessionEvent should return null when disabled");
+    // .token-ops directory should not have been created either
+    assert.equal(existsSync(join(cwd, ".token-ops")), false, ".token-ops/ must not be created when disabled");
+  } finally {
+    if (originalValue === undefined) {
+      delete process.env.TOKEN_OPS_DISABLE_LOG;
+    } else {
+      process.env.TOKEN_OPS_DISABLE_LOG = originalValue;
+    }
+  }
+});
+
+test("recordSessionEvent still logs when TOKEN_OPS_DISABLE_LOG is unset", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-log-default-"));
+  const before = process.env.TOKEN_OPS_DISABLE_LOG;
+  delete process.env.TOKEN_OPS_DISABLE_LOG;
+  try {
+    const returnValue = recordSessionEvent(cwd, { type: "test", task: "default", budget: {} });
+    assert.ok(returnValue && returnValue.endsWith("session.jsonl"));
+  } finally {
+    if (before !== undefined) process.env.TOKEN_OPS_DISABLE_LOG = before;
+  }
 });
 
 test("recordSessionEvent does not rewrite the file when under the cap", () => {
