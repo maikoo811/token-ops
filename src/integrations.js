@@ -1,8 +1,18 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const GITIGNORE_MARKER = ".token-ops/";
-const GITIGNORE_BLOCK = "# Token Ops session log\n.token-ops/\n";
+// .gitignore lines we manage. Two distinct entries because they protect
+// against different leaks:
+// - .token-ops/      — local session log (may contain prompts with secrets)
+// - .claude/settings.local.json — Claude Code hook config with an absolute
+//   `cliPath` baked in from `process.argv[1]`. Committing it would leak the
+//   maintainer's username/home path AND break the config for teammates whose
+//   node lives somewhere else.
+const GITIGNORE_HEADER = "# Token Ops local files";
+const GITIGNORE_ENTRIES = [".token-ops/", ".claude/settings.local.json"];
+// Legacy header used by v0.4.x installs; recognized on uninstall so older
+// gitignore blocks are cleaned up correctly.
+const GITIGNORE_LEGACY_HEADER = "# Token Ops session log";
 
 export function installIntegration({ cwd, target, cliPath, triggerMode = "smart" }) {
   const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex"]);
@@ -49,14 +59,24 @@ export function installIntegration({ cwd, target, cliPath, triggerMode = "smart"
 
 function ensureGitignoreEntry(gitignorePath) {
   const existing = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
-  if (existing.includes(GITIGNORE_MARKER)) {
+
+  // Detect which managed entries are still missing. Substring match is fine —
+  // both entries are distinctive enough that false positives in unrelated
+  // gitignore lines are vanishingly unlikely.
+  const missing = GITIGNORE_ENTRIES.filter((entry) => !existing.includes(entry));
+  if (missing.length === 0) {
     return null;
   }
 
   const separator = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
   const blockPrefix = existing.length > 0 ? "\n" : "";
-  writeFileSync(gitignorePath, existing + separator + blockPrefix + GITIGNORE_BLOCK);
-  return existing.length === 0 ? ".gitignore (created)" : ".gitignore (.token-ops/ added)";
+  const block = `${GITIGNORE_HEADER}\n${missing.join("\n")}\n`;
+  writeFileSync(gitignorePath, existing + separator + blockPrefix + block);
+
+  if (existing.length === 0) {
+    return ".gitignore (created)";
+  }
+  return `.gitignore (${missing.join(", ")} added)`;
 }
 
 function removeGitignoreEntry(gitignorePath) {
@@ -65,17 +85,35 @@ function removeGitignoreEntry(gitignorePath) {
   }
 
   const current = readFileSync(gitignorePath, "utf8");
-  if (!current.includes(GITIGNORE_MARKER)) {
+  const hasManagedEntry = GITIGNORE_ENTRIES.some((entry) => current.includes(entry));
+  if (!hasManagedEntry) {
     return null;
   }
 
-  // Strip our exact block (with surrounding blank lines) first; fall back to a
-  // line-by-line removal if a user edited the block manually.
-  let cleaned = current.replace(/\n*# Token Ops session log\n\.token-ops\/\n/g, "\n");
-  if (cleaned.includes(GITIGNORE_MARKER)) {
+  // Strip our managed block in all known shapes. Try the most specific
+  // (current full block) first, then partial-install variants, then legacy.
+  let cleaned = current
+    // Current full block: header + both entries
+    .replace(
+      /\n*# Token Ops local files\n\.token-ops\/\n\.claude\/settings\.local\.json\n/g,
+      "\n"
+    )
+    // Partial install (only one entry added under our header)
+    .replace(/\n*# Token Ops local files\n\.token-ops\/\n/g, "\n")
+    .replace(/\n*# Token Ops local files\n\.claude\/settings\.local\.json\n/g, "\n")
+    // Legacy v0.4.x header
+    .replace(/\n*# Token Ops session log\n\.token-ops\/\n/g, "\n");
+
+  // Line-by-line fallback if a user edited the block manually.
+  if (GITIGNORE_ENTRIES.some((entry) => cleaned.includes(entry))) {
+    const stripLines = new Set([
+      ...GITIGNORE_ENTRIES,
+      GITIGNORE_HEADER,
+      GITIGNORE_LEGACY_HEADER
+    ]);
     cleaned = cleaned
       .split("\n")
-      .filter((line) => line.trim() !== ".token-ops/" && line.trim() !== "# Token Ops session log")
+      .filter((line) => !stripLines.has(line.trim()))
       .join("\n");
   }
 
@@ -90,7 +128,7 @@ function removeGitignoreEntry(gitignorePath) {
   }
 
   writeFileSync(gitignorePath, cleaned);
-  return ".gitignore (.token-ops/ removed)";
+  return ".gitignore (Token Ops entries removed)";
 }
 
 export function uninstallIntegration({ cwd, target }) {

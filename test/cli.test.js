@@ -176,6 +176,61 @@ test("uninstall removes the .token-ops/ entry it added", () => {
   assert.doesNotMatch(contents, /\.token-ops\//);
 });
 
+test("install also adds .claude/settings.local.json to .gitignore", () => {
+  // The file contains an absolute cliPath from process.argv[1], so leaking
+  // it via git would break the config for any teammate whose node binary
+  // lives at a different path. Belongs in .gitignore for the same reason
+  // .token-ops/ does.
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-gitignore-claude-"));
+  execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+  const contents = readFileSync(join(cwd, ".gitignore"), "utf8");
+  assert.match(contents, /\.claude\/settings\.local\.json/);
+});
+
+test("install output explains why .claude/settings.local.json is gitignored", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-install-note-"));
+  const output = execFileSync(process.execPath, [cli, "install"], {
+    cwd,
+    encoding: "utf8"
+  });
+  // We only require that the note is shown and mentions the path. The
+  // exact wording is allowed to drift across releases.
+  assert.match(output, /\.claude\/settings\.local\.json/);
+  assert.match(output, /absolute path|stay local|gitignored/i);
+});
+
+test("uninstall removes the .claude/settings.local.json entry it added", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-gitignore-claude-uninstall-"));
+  writeFileSync(join(cwd, ".gitignore"), "node_modules/\n");
+
+  execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+  execFileSync(process.execPath, [cli, "uninstall"], { cwd, encoding: "utf8" });
+
+  const contents = readFileSync(join(cwd, ".gitignore"), "utf8");
+  assert.match(contents, /node_modules\//);
+  assert.doesNotMatch(contents, /\.claude\/settings\.local\.json/);
+});
+
+test("install upgrades a v0.4.x-style gitignore block (legacy header + only .token-ops/)", () => {
+  // Simulates a repo where token-ops was installed under v0.4.x: the old
+  // block has the "session log" header and only the .token-ops/ entry.
+  // A re-install on v0.4.5+ should add the missing claude entry without
+  // duplicating the existing one.
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-gitignore-upgrade-"));
+  writeFileSync(
+    join(cwd, ".gitignore"),
+    "node_modules/\n\n# Token Ops session log\n.token-ops/\n"
+  );
+
+  execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+
+  const contents = readFileSync(join(cwd, ".gitignore"), "utf8");
+  assert.match(contents, /\.token-ops\//);
+  assert.match(contents, /\.claude\/settings\.local\.json/);
+  const tokenOpsCount = (contents.match(/\.token-ops\//g) || []).length;
+  assert.equal(tokenOpsCount, 1, "must not duplicate .token-ops/ when upgrading");
+});
+
 test("install claude-hook --trigger-mode aggressive bakes the flag into settings", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-trigger-mode-"));
 
