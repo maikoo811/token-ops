@@ -326,6 +326,50 @@ export function readSavingsReport(cwd) {
   });
 }
 
+// ANSI color helpers — applied ONLY when explicitly enabled (typically when
+// stdout is a TTY). Hook injection, MCP responses, --output file writes, and
+// piped CLI output all stay as plain markdown so downstream LLMs / scripts
+// see clean text. We hand-roll the escape codes instead of pulling in a
+// chalk-style dep — keeps Token Ops zero-runtime-deps and small.
+const ANSI = {
+  reset: "\x1b[0m",
+  bold: "\x1b[1m",
+  dim: "\x1b[2m",
+  cyan: "\x1b[36m",
+  green: "\x1b[32m"
+};
+
+export function colorizeForTty(markdown, enabled = false) {
+  if (!enabled) {
+    return markdown;
+  }
+
+  return markdown
+    .split("\n")
+    .map((line) => {
+      // Top-level heading: bold + cyan ("# Token Ops Context Pack").
+      if (/^# /.test(line)) {
+        return `${ANSI.bold}${ANSI.cyan}${line}${ANSI.reset}`;
+      }
+      // Section heading: cyan ("## Token Budget", "## Task", ...).
+      if (/^## /.test(line)) {
+        return `${ANSI.cyan}${line}${ANSI.reset}`;
+      }
+      // Snippet file heading: dim ("### src/core.js"). Keeps focus on the
+      // budget block while still showing the structure.
+      if (/^### /.test(line)) {
+        return `${ANSI.dim}${line}${ANSI.reset}`;
+      }
+      // Highlight any "(NN%)" — bold green. This is the headline number
+      // a reader wants to see on Estimated saved + Avoided vs whole repo.
+      return line.replace(
+        /\((\d+)%\)/g,
+        (_, n) => `${ANSI.bold}${ANSI.green}(${n}%)${ANSI.reset}`
+      );
+    })
+    .join("\n");
+}
+
 export function renderSavingsReport(report, lang = "en") {
   if (lang === "ja") {
     return [

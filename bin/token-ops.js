@@ -21,6 +21,7 @@ import {
   DEFAULT_MAX_FILES,
   DEFAULT_MAX_LINES,
   DEFAULT_TRIGGER_MODE,
+  colorizeForTty,
   estimateContextCost,
   generatePack,
   listHighCostFiles,
@@ -110,10 +111,14 @@ function runPack(values) {
   });
 
   if (options.output) {
+    // File output stays plain — downstream consumers shouldn't get ANSI.
     writeFileSync(join(cwd, options.output), result.markdown);
     console.log(`Wrote ${options.output}`);
   } else {
-    process.stdout.write(result.markdown);
+    // Stdout: colorize only when a human is looking. Piped/redirected
+    // stdout (isTTY === undefined) stays plain so jq / grep / capture
+    // still see clean markdown.
+    process.stdout.write(colorizeForTty(result.markdown, process.stdout.isTTY === true));
   }
 }
 
@@ -250,7 +255,8 @@ function runHook(values) {
 
 function runReport(values) {
   const lang = resolveLanguage(parseLangOnly(values), "");
-  process.stdout.write(`${renderSavingsReport(readSavingsReport(process.cwd()), lang)}\n`);
+  const markdown = renderSavingsReport(readSavingsReport(process.cwd()), lang);
+  process.stdout.write(`${colorizeForTty(markdown, process.stdout.isTTY === true)}\n`);
 }
 
 function runCost(values) {

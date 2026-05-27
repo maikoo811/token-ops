@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  colorizeForTty,
   extractKeywords,
   estimateTokens,
   finalizeTokenBudget,
@@ -271,6 +272,44 @@ test("recordSessionEvent does not rewrite the file when under the cap", () => {
   const secondSize = statSync(path).size;
 
   assert.ok(secondSize > firstSize, "small logs should just append, not rotate");
+});
+
+// ---- colorizeForTty ----
+
+test("colorizeForTty returns input unchanged when disabled", () => {
+  const md = "# Title\n\n## Section\n- Estimated saved: ~100 tokens (75%)\n";
+  assert.equal(colorizeForTty(md, false), md);
+  assert.equal(colorizeForTty(md), md, "default disabled");
+});
+
+test("colorizeForTty wraps top-level # heading in bold + cyan", () => {
+  const out = colorizeForTty("# Token Ops Context Pack", true);
+  // \x1b[1m = bold, \x1b[36m = cyan, \x1b[0m = reset
+  assert.equal(out, "\x1b[1m\x1b[36m# Token Ops Context Pack\x1b[0m");
+});
+
+test("colorizeForTty wraps ## section headings in cyan only (no bold)", () => {
+  const out = colorizeForTty("## Token Budget", true);
+  assert.equal(out, "\x1b[36m## Token Budget\x1b[0m");
+});
+
+test("colorizeForTty highlights every (NN%) match in bold green", () => {
+  const out = colorizeForTty("- saved 75%, avoided (75%) (94%)", true);
+  // Bare 75% (no parens) is NOT highlighted; parenthesized matches are.
+  assert.match(out, /\x1b\[1m\x1b\[32m\(75%\)\x1b\[0m/);
+  assert.match(out, /\x1b\[1m\x1b\[32m\(94%\)\x1b\[0m/);
+  assert.ok(!out.includes("\x1b[1m\x1b[32m75%"), "bare 75% must stay plain");
+});
+
+test("colorizeForTty leaves plain prose lines untouched", () => {
+  const plain = "Just a body line with no heading or percent.";
+  assert.equal(colorizeForTty(plain, true), plain);
+});
+
+test("colorizeForTty dims ### snippet file headings", () => {
+  const out = colorizeForTty("### src/core.js", true);
+  // \x1b[2m = dim
+  assert.equal(out, "\x1b[2m### src/core.js\x1b[0m");
 });
 
 // ---- symlink guards on session.jsonl ----
