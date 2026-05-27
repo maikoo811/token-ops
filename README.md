@@ -2,7 +2,7 @@
 
 Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Claude Code, Codex, and other MCP-compatible agents a compact task-focused context pack before they read broadly, then records an estimated saved-token report.
 
-The product goal is simple: install once, vibe code normally, and see how much context the agent avoided. No API key, no account, no cloud backend, no telemetry by default.
+Install once, code normally, see how much the agent avoided reading. No API key, no account, no cloud backend, no telemetry by default.
 
 ## How it works
 
@@ -27,13 +27,16 @@ sequenceDiagram
     A-->>U: answer
 ```
 
-Same answer quality, fewer tokens. If the prepared context isn't enough, the AI can still look around — Token Ops only adds; it never blocks.
+Same answer quality, fewer tokens. The AI can still read more files if the pack isn't enough.
 
 ## Measured Savings
 
-These numbers are real — we measured them while building this project itself with Token Ops running. You can reproduce them on your own machine with [`docs/session-stats.mjs`](docs/session-stats.mjs) (zero dependencies).
+Example:
 
-If the AI had read the relevant files in full, it would have used **~288,000 tokens**. Token Ops compressed those into **~71,000 tokens** — about **4× smaller**. That's **~217,000 tokens saved**, or **~$0.65 on Sonnet 4.5** / **~$3.25 on Opus 4.7** at API list prices.
+![Token Ops CLI output: 60% saved on a refactor task, 76% against the whole repo](assets/screenshots/measured-savings.png)
+
+- Total tokens across this project's history: **~288,000 → ~71,000** (4× smaller)
+- Saved: **~217,000 tokens** ≈ **$0.65 (Sonnet 4.5)** / **$3.25 (Opus 4.7)**
 
 ### By prompt type
 
@@ -78,7 +81,7 @@ After installing the hook and using Claude Code for a while, see [**Your savings
 
 ## Cursor Plugin
 
-Distributed via the [Cursor Marketplace](https://cursor.com/marketplace). Bundles the MCP server, an `alwaysApply: true` rule that nudges the agent to use `build_compact_context` first, and the four tools listed below. See **Levels of Automation** for setup options.
+On the [Cursor Marketplace](https://cursor.com/marketplace). Includes the MCP server, a rule that calls `build_compact_context` first, and the tools below. See **Levels of Automation**.
 
 ## MCP Tools
 
@@ -89,15 +92,17 @@ Distributed via the [Cursor Marketplace](https://cursor.com/marketplace). Bundle
 
 ## Levels of Automation
 
-Token Ops can run anywhere from "type a command every time" to "fires on every prompt automatically." Pick the level that matches the editor you use and how much per-project setup you want.
+Pick by editor and how much setup you want:
 
 | Level | Editor | Setup | What happens per prompt |
 |---|---|---|---|
-| **★★★★ Pre-injection** | Claude Code | `token-ops install claude-hook` (once per project) | A `UserPromptSubmit` hook **physically prepends** a compact pack to every prompt. Strongest guarantee — works even if the model would otherwise ignore the tool. Add `--trigger-mode aggressive` to fire on every prompt (≥ 6 chars, non self-referential); the default `smart` only fires on coding-keyword prompts. |
-| **★★★ One-click plugin** | Cursor (Marketplace) | One-click install once Token Ops is published to <https://cursor.com/marketplace> | Plugin bundles MCP server + `alwaysApply: true` rule. Agent is told to call `build_compact_context` first on every task. |
-| **★★ Global rule** | Cursor (any version) | Paste the rule below into `Cursor Settings → Rules → User Rules` once | Same agent-side instruction as the plugin path, applies to every project without per-project install. |
-| **★ Per-project rule** | Cursor | `token-ops install cursor` inside each project | Same rule, scoped to that project's `.cursor/rules/token-ops.mdc`. Use when you don't want a global default. |
-| **Manual** | Any editor | None | Type `Use build_compact_context for: <task>` in chat each time. Fine for trying things out. |
+| **★★★★ Pre-injection** | Claude Code | `token-ops install claude-hook` | A hook prepends a compact pack to every prompt. Works even if the model would skip the tool. |
+| **★★★ One-click plugin** | Cursor (Marketplace) | One click (once published) | Agent is told to call `build_compact_context` first. |
+| **★★ Global rule** | Cursor | Paste the rule into `Settings → Rules → User Rules` | Same as ★★★ but rule-based, applies to every project. |
+| **★ Per-project rule** | Cursor | `token-ops install cursor` | Same as ★★ but scoped to one project. |
+| **Manual** | Any | None | Type `Use build_compact_context for: <task>` in chat. |
+
+> ★★★★ also supports `--trigger-mode aggressive` to fire on every prompt ≥ 6 chars (default `smart` requires a coding keyword).
 
 ### Picking a level
 
@@ -172,7 +177,7 @@ token-ops install claude-hook --trigger-mode aggressive    # Claude Code only, f
 token-ops uninstall                                        # clean removal
 ```
 
-`uninstall` is non-destructive: it only removes the files and JSON keys Token Ops added. Unrelated `.claude/settings.local.json` entries, `AGENTS.md` content, and `.cursor/rules` files are preserved. Run `token-ops install --help` for the full list of targets.
+`uninstall` removes only what `install` added. Unrelated settings stay. Run `token-ops install --help` for the full list of targets.
 
 ## Your savings log
 
