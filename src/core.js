@@ -326,6 +326,95 @@ export function readSavingsReport(cwd) {
   });
 }
 
+// Strip the parts of a pack that have no user-visible value when a human is
+// reading the CLI output in their terminal. Keeps only:
+//   - `## Task` (echoes what they typed — useful confirmation)
+//   - `## Token Budget` (the value proposition — saved tokens, %)
+//   - `## Relevant Files` (the "did Token Ops pick the right files" proof)
+//
+// Removed because the user already has the info, can see it in their shell
+// prompt, or it's purely LLM-oriented templating:
+//   - `## Suggested Prompt` / `## 推奨プロンプト` (LLM brief)
+//   - `## Repository` / `## リポジトリ` (cwd + branch — already in their shell)
+//   - `## Git Status` / `## Git状態` (they just made the changes themselves)
+//   - `## Keywords` / `## キーワード` (debug-only diagnostic)
+//   - `## Snippets` / `## 抜粋` (their own source code, on their own disk)
+//
+// Every removed section is essential for downstream LLM consumption (hook,
+// MCP, piped output, file output), so this function is only applied at the
+// CLI TTY layer — never to the pack that gets sent to a model or written
+// to disk.
+const TERMINAL_DROP_SECTIONS = [
+  "Suggested Prompt", "推奨プロンプト",
+  "Repository",       "リポジトリ",
+  "Git Status",       "Git状態",
+  "Keywords",         "キーワード"
+];
+
+export function simplifyForTerminal(markdown) {
+  // Remove each "drop" section in-place. The non-greedy `[\s\S]*?(?=\n## )`
+  // body match stops at the next top-level "## " heading. Every section in
+  // the pack starts with "## " so the lookahead is reliable; snippet file
+  // sub-headings use "### " and won't be confused for a section boundary.
+  const headingPattern = TERMINAL_DROP_SECTIONS
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  const dropRegex = new RegExp(`\\n## (?:${headingPattern})\\n[\\s\\S]*?(?=\\n## )`, "g");
+  let out = markdown.replace(dropRegex, "");
+
+  // Truncate at the snippets heading and append a footer telling the user
+  // how to see them when they actually need to.
+  const parts = out.split(/\n## (?:Snippets|抜粋)\n/);
+  if (parts.length === 1) {
+    return out;
+  }
+  return `${parts[0]}\n\n_(snippets hidden in terminal view — run with \`--full\` or pipe to a file to see them)_\n`;
+}
+
+// ANSI color helpers — applied ONLY when explicitly enabled (typically when
+// stdout is a TTY). Hook injection, MCP responses, --output file writes, and
+// piped CLI output all stay as plain markdown so downstream LLMs / scripts
+// see clean text. We hand-roll the escape codes instead of pulling in a
+// chalk-style dep — keeps Token Ops zero-runtime-deps and small.
+const ANSI = {
+  reset: "\x1b[0m",
+  bold: "\x1b[1m",
+  dim: "\x1b[2m",
+  cyan: "\x1b[36m",
+  green: "\x1b[32m"
+};
+
+export function colorizeForTty(markdown, enabled = false) {
+  if (!enabled) {
+    return markdown;
+  }
+
+  return markdown
+    .split("\n")
+    .map((line) => {
+      // Top-level heading: bold + cyan ("# Token Ops Context Pack").
+      if (/^# /.test(line)) {
+        return `${ANSI.bold}${ANSI.cyan}${line}${ANSI.reset}`;
+      }
+      // Section heading: cyan ("## Token Budget", "## Task", ...).
+      if (/^## /.test(line)) {
+        return `${ANSI.cyan}${line}${ANSI.reset}`;
+      }
+      // Snippet file heading: dim ("### src/core.js"). Keeps focus on the
+      // budget block while still showing the structure.
+      if (/^### /.test(line)) {
+        return `${ANSI.dim}${line}${ANSI.reset}`;
+      }
+      // Highlight any "(NN%)" — bold green. This is the headline number
+      // a reader wants to see on Estimated saved + Avoided vs whole repo.
+      return line.replace(
+        /\((\d+)%\)/g,
+        (_, n) => `${ANSI.bold}${ANSI.green}(${n}%)${ANSI.reset}`
+      );
+    })
+    .join("\n");
+}
+
 export function renderSavingsReport(report, lang = "en") {
   if (lang === "ja") {
     return [

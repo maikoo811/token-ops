@@ -21,9 +21,11 @@ import {
   DEFAULT_MAX_FILES,
   DEFAULT_MAX_LINES,
   DEFAULT_TRIGGER_MODE,
+  colorizeForTty,
   estimateContextCost,
   generatePack,
   listHighCostFiles,
+  simplifyForTerminal,
   readLanguage,
   readSavingsReport,
   readTriggerMode,
@@ -110,10 +112,24 @@ function runPack(values) {
   });
 
   if (options.output) {
+    // File output stays plain markdown WITH snippets — downstream
+    // consumers (other LLMs, scripts) need the full content.
     writeFileSync(join(cwd, options.output), result.markdown);
     console.log(`Wrote ${options.output}`);
   } else {
-    process.stdout.write(result.markdown);
+    // Stdout. Two TTY-conditioned transforms:
+    //   1. When a human is looking (unless --full), strip the sections that
+    //      only exist for the LLM: the Suggested Prompt template and the
+    //      Snippets body. Piped output (isTTY === undefined) keeps them so
+    //      `token-ops pack ... | pbcopy` still pastes a full pack into
+    //      another LLM. The hook and MCP paths never go through here.
+    //   2. Colorize markdown headings + saved% only when stdout is a TTY.
+    const isTty = process.stdout.isTTY === true;
+    let markdown = result.markdown;
+    if (isTty && !options.full) {
+      markdown = simplifyForTerminal(markdown);
+    }
+    process.stdout.write(colorizeForTty(markdown, isTty));
   }
 }
 
@@ -250,7 +266,8 @@ function runHook(values) {
 
 function runReport(values) {
   const lang = resolveLanguage(parseLangOnly(values), "");
-  process.stdout.write(`${renderSavingsReport(readSavingsReport(process.cwd()), lang)}\n`);
+  const markdown = renderSavingsReport(readSavingsReport(process.cwd()), lang);
+  process.stdout.write(`${colorizeForTty(markdown, process.stdout.isTTY === true)}\n`);
 }
 
 function runCost(values) {
@@ -275,7 +292,8 @@ function parsePackArgs(values) {
     output: "",
     maxFiles: DEFAULT_MAX_FILES,
     maxLines: DEFAULT_MAX_LINES,
-    lang: DEFAULT_LANG
+    lang: DEFAULT_LANG,
+    full: false
   };
 
   for (let index = 0; index < values.length; index += 1) {
@@ -288,6 +306,12 @@ function parsePackArgs(values) {
       parsed.maxLines = toPositiveInt(readOptionValue(values, ++index, value), value);
     } else if (value === "--lang") {
       parsed.lang = readLanguage(readOptionValue(values, ++index, value));
+    } else if (value === "--full") {
+      // Force-include snippets even in TTY mode. Default for TTY is to hide
+      // them since a human running pack in their own repo already has the
+      // source files locally — only the token budget + ranked file list is
+      // novel information.
+      parsed.full = true;
     } else {
       parsed.taskParts.push(value);
     }
@@ -298,7 +322,8 @@ function parsePackArgs(values) {
     output: parsed.output,
     maxFiles: parsed.maxFiles,
     maxLines: parsed.maxLines,
-    lang: parsed.lang
+    lang: parsed.lang,
+    full: parsed.full
   };
 }
 
@@ -355,6 +380,10 @@ Options:
   -o, --output <file>             Write Markdown pack to a file
   --max-files <number>            Number of relevant files to include (default: ${DEFAULT_MAX_FILES})
   --max-lines <number>            Max snippet lines per file (default: ${DEFAULT_MAX_LINES})
+  --full                          (pack) Show the LLM-oriented sections (Suggested
+                                  Prompt + Snippets) in terminal output. Default in
+                                  TTY mode hides them; piped / file output always
+                                  includes them.
   --lang <auto|en|ja>             Output language for packs and reports (default: ${DEFAULT_LANG})
   --trigger-mode <smart|aggressive>  Hook firing policy. smart (default) requires a
                                   coding keyword; aggressive fires on any prompt that
