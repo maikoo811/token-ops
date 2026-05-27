@@ -9,6 +9,7 @@ import {
   extractKeywords,
   estimateTokens,
   finalizeTokenBudget,
+  simplifyForTerminal,
   readSavingsReport,
   recordSessionEvent,
   SESSION_LOG_KEEP_LINES,
@@ -272,6 +273,112 @@ test("recordSessionEvent does not rewrite the file when under the cap", () => {
   const secondSize = statSync(path).size;
 
   assert.ok(secondSize > firstSize, "small logs should just append, not rotate");
+});
+
+// ---- simplifyForTerminal ----
+
+test("simplifyForTerminal keeps Task + Token Budget + Relevant Files, drops the rest (English)", () => {
+  const md = [
+    "# Token Ops Context Pack",
+    "",
+    "## Task",
+    "Fix the bug",
+    "",
+    "## Token Budget",
+    "- Estimated saved: ~100 tokens (75%)",
+    "",
+    "## Suggested Prompt",
+    "Use the context below to work on this task.",
+    "",
+    "Task: Fix the bug",
+    "",
+    "## Repository",
+    "- Root: /path",
+    "- Branch: main",
+    "",
+    "## Git Status",
+    "- M src/core.js",
+    "",
+    "## Keywords",
+    "`fix`, `bug`",
+    "",
+    "## Relevant Files",
+    "- src/core.js (~100 tokens full file)",
+    "",
+    "## Snippets",
+    "### src/core.js",
+    "```js",
+    "lots of code",
+    "```"
+  ].join("\n");
+  const out = simplifyForTerminal(md);
+  // Kept
+  assert.ok(out.includes("## Task"));
+  assert.ok(out.includes("Fix the bug"));
+  assert.ok(out.includes("## Token Budget"));
+  assert.ok(out.includes("(75%)"));
+  assert.ok(out.includes("## Relevant Files"));
+  assert.ok(out.includes("src/core.js (~100 tokens full file)"));
+  // Removed
+  assert.ok(!out.includes("## Suggested Prompt"));
+  assert.ok(!out.includes("Use the context below"));
+  assert.ok(!out.includes("## Repository"));
+  assert.ok(!out.includes("## Git Status"));
+  assert.ok(!out.includes("## Keywords"));
+  assert.ok(!out.includes("## Snippets"));
+  assert.ok(!out.includes("lots of code"));
+  // Footer hint for snippet recovery
+  assert.match(out, /snippets hidden in terminal view/);
+});
+
+test("simplifyForTerminal handles Japanese counterparts equivalently", () => {
+  const md = [
+    "# Token Ops コンテキストパック",
+    "",
+    "## タスク",
+    "バグを直して",
+    "",
+    "## トークン予算",
+    "- 推定削減: ~100 tokens (75%)",
+    "",
+    "## 推奨プロンプト",
+    "以下の文脈を使ってタスクを進めてください。",
+    "",
+    "## リポジトリ",
+    "- Root: /path",
+    "",
+    "## Git状態",
+    "- M src/core.js",
+    "",
+    "## キーワード",
+    "`バグ`",
+    "",
+    "## 関連ファイル",
+    "- src/core.js",
+    "",
+    "## 抜粋",
+    "### src/core.js",
+    "```js",
+    "code",
+    "```"
+  ].join("\n");
+  const out = simplifyForTerminal(md);
+  // Kept
+  assert.ok(out.includes("## タスク"));
+  assert.ok(out.includes("## トークン予算"));
+  assert.ok(out.includes("## 関連ファイル"));
+  // Removed
+  assert.ok(!out.includes("## 推奨プロンプト"));
+  assert.ok(!out.includes("## リポジトリ"));
+  assert.ok(!out.includes("## Git状態"));
+  assert.ok(!out.includes("## キーワード"));
+  assert.ok(!out.includes("## 抜粋"));
+  assert.ok(!out.includes("code"));
+});
+
+test("simplifyForTerminal is a no-op when the markdown has none of the dropped sections", () => {
+  const md = "# Title\n\n## Body\nsome text\n";
+  assert.equal(simplifyForTerminal(md), md);
 });
 
 // ---- colorizeForTty ----
