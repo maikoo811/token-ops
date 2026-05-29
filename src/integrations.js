@@ -14,7 +14,7 @@ const GITIGNORE_ENTRIES = [".token-ops/", ".claude/settings.local.json"];
 // gitignore blocks are cleaned up correctly.
 const GITIGNORE_LEGACY_HEADER = "# Token Ops session log";
 
-export function installIntegration({ cwd, target, cliPath, triggerMode = "smart" }) {
+export function installIntegration({ cwd, target, cliPath, nodePath, triggerMode = "smart" }) {
   const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex"]);
 
   if (!validTargets.has(target)) {
@@ -33,7 +33,7 @@ export function installIntegration({ cwd, target, cliPath, triggerMode = "smart"
   if (target === "all" || target === "claude-hook") {
     const settingsPath = join(cwd, ".claude", "settings.local.json");
     mkdirSync(join(cwd, ".claude"), { recursive: true });
-    writeFileSync(settingsPath, renderClaudeHookSettings(settingsPath, cliPath, triggerMode));
+    writeFileSync(settingsPath, renderClaudeHookSettings(settingsPath, cliPath, triggerMode, nodePath));
     installed.push(".claude/settings.local.json");
   }
 
@@ -319,18 +319,24 @@ Use that compact context first. Read additional files only when the pack is insu
 `;
 }
 
-function renderClaudeHookSettings(settingsPath, cliPath, triggerMode = "smart") {
+function renderClaudeHookSettings(settingsPath, cliPath, triggerMode = "smart", nodePath) {
   const existing = readExistingSettings(settingsPath);
   const args = [cliPath, "hook", "claude-user-prompt-submit"];
   if (triggerMode && triggerMode !== "smart") {
     args.push("--trigger-mode", triggerMode);
   }
+  // Use the absolute path to the node binary that ran the installer rather
+  // than the bare "node". Cursor / Claude Code launched from a GUI shortcut
+  // (Dock, Spotlight, etc.) inherit a minimal PATH that does NOT include
+  // nvm or any user shell rc, so a bare "node" would fail to resolve. The
+  // absolute path is also why .claude/settings.local.json is gitignored.
+  const command = typeof nodePath === "string" && nodePath.length > 0 ? nodePath : "node";
   const hook = {
     matcher: "",
     hooks: [
       {
         type: "command",
-        command: "node",
+        command,
         args,
         timeout: 10
       }

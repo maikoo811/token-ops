@@ -149,6 +149,9 @@ function runInstall(values) {
     cwd: process.cwd(),
     target,
     cliPath: process.argv[1],
+    // Pin the hook's node binary to whatever ran this install. GUI-launched
+    // Cursor / Claude Code don't inherit nvm in PATH, so a bare "node" fails.
+    nodePath: process.execPath,
     triggerMode
   });
 
