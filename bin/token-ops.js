@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
-// ESM imports below are hoisted, so this runs after them — but on Node 16/17
-// the imports themselves still succeed (basic ESM works since 14), so this
-// guard catches the most common "almost-supported but actually too old" case
-// and emits a readable upgrade message instead of letting the rest of the
-// code fail with a node:test or top-level-await error later.
+// Manual version guard: the ESM imports below are hoisted, so a `package.json`
+// `engines` failure would surface as an opaque syntax error on Node 16/17
+// before this file's logic runs. Emit a readable message instead.
 const NODE_MAJOR = Number.parseInt(process.versions.node.split(".")[0], 10);
 if (NODE_MAJOR < 18) {
   process.stderr.write(
@@ -112,18 +110,9 @@ function runPack(values) {
   });
 
   if (options.output) {
-    // File output stays plain markdown WITH snippets — downstream
-    // consumers (other LLMs, scripts) need the full content.
     writeFileSync(join(cwd, options.output), result.markdown);
     console.log(`Wrote ${options.output}`);
   } else {
-    // Stdout. Two TTY-conditioned transforms:
-    //   1. When a human is looking (unless --full), strip the sections that
-    //      only exist for the LLM: the Suggested Prompt template and the
-    //      Snippets body. Piped output (isTTY === undefined) keeps them so
-    //      `token-ops pack ... | pbcopy` still pastes a full pack into
-    //      another LLM. The hook and MCP paths never go through here.
-    //   2. Colorize markdown headings + saved% only when stdout is a TTY.
     const isTty = process.stdout.isTTY === true;
     let markdown = result.markdown;
     if (isTty && !options.full) {
@@ -155,10 +144,6 @@ function runInstall(values) {
 
   console.log(`Installed token-ops integration:\n${installed.map((file) => `- ${file}`).join("\n")}`);
 
-  // Explain why settings.local.json is gitignored. It bakes in an absolute
-  // node path from process.argv[1] — sharing it via git breaks the config
-  // for anyone whose node lives at a different path and leaks the
-  // maintainer's username (e.g. /Users/<name>/.nvm/...) through the repo.
   if (installed.includes(".claude/settings.local.json")) {
     console.log(
       "\nNote: .claude/settings.local.json was added to .gitignore — it contains an absolute\n" +
@@ -205,10 +190,6 @@ function runHook(values) {
 
   const input = readJsonFromStdin();
   const prompt = String(input.prompt || "").trim();
-  // input.cwd comes from Claude Code's stdin payload. In practice that's the
-  // editor itself, but treat it defensively so a bug in workspace detection
-  // (or a future client passing something weird) silently falls back to the
-  // server's process.cwd() instead of crashing the hook.
   let hookCwd;
   try {
     hookCwd = validateCwd(String(input.cwd || process.cwd()));
@@ -216,8 +197,6 @@ function runHook(values) {
     try {
       hookCwd = validateCwd(process.cwd());
     } catch {
-      // Even process.cwd() isn't a valid git repo (e.g. hook fired outside a
-      // repository entirely). Emit no additional context and exit cleanly.
       process.stdout.write("{}");
       return;
     }
@@ -308,10 +287,6 @@ function parsePackArgs(values) {
     } else if (value === "--lang") {
       parsed.lang = readLanguage(readOptionValue(values, ++index, value));
     } else if (value === "--full") {
-      // Force-include snippets even in TTY mode. Default for TTY is to hide
-      // them since a human running pack in their own repo already has the
-      // source files locally — only the token budget + ranked file list is
-      // novel information.
       parsed.full = true;
     } else {
       parsed.taskParts.push(value);

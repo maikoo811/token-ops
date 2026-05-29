@@ -14,15 +14,11 @@ import {
   validateCwd
 } from "../src/core.js";
 
-// Structured stderr logger: keeps the [token-ops-mcp] prefix that operators
-// (and existing tests) grep for, but adds a level and ISO timestamp so logs
-// captured by Cursor / Claude Code are easy to triage.
+// Preserves the [token-ops-mcp] prefix tests grep for.
 function log(level, message) {
   process.stderr.write(`[token-ops-mcp] ${level} ${new Date().toISOString()} ${message}\n`);
 }
 
-// Surface crashes on stderr so Cursor / Claude Code can show a real error
-// instead of a silent "server in error state."
 process.on("uncaughtException", (err) => {
   log("FATAL", `uncaught exception: ${err.stack || err.message}`);
   process.exit(1);
@@ -40,17 +36,9 @@ const PACKAGE_VERSION = (() => {
 const BEGINNER_MAX_FILES = 6;
 const BEGINNER_MAX_LINES = 80;
 
-// Cap concurrent tool calls. Each pack reads every tracked file in the repo;
-// a misbehaving MCP client looping requests could saturate disk I/O. Three
-// in-flight is generous for any sane client and prevents the runaway case.
 const MAX_IN_FLIGHT = 3;
 let inFlight = 0;
 
-// Hard caps on caller-supplied iteration bounds. Internal MAX_TRACKED_FILES
-// already protects against giant repos, but a misbehaving MCP client passing
-// e.g. maxFiles=10000 would still amplify per-file work (ranking, snippet
-// extraction, token estimation). Clamp here so the caller can't dictate
-// runaway iteration costs even within a single tools/call.
 const HARD_LIMIT_MAX_FILES = 50;
 const HARD_LIMIT_MAX_LINES = 300;
 const HARD_LIMIT_LIST_LIMIT = 200;
@@ -73,10 +61,8 @@ function clampListLimit(raw, fallback) {
   return Math.min(n, HARD_LIMIT_LIST_LIMIT);
 }
 
-// MCP stdio transport per the 2025 spec uses newline-delimited JSON:
-// each line on stdin is one complete JSON-RPC message, each response is
-// a JSON object followed by "\n". We also tolerate the legacy LSP-style
-// Content-Length framing as a fallback so older clients still work.
+// MCP 2025 spec: newline-delimited JSON-RPC. Legacy LSP-style
+// Content-Length framing kept as a fallback for older clients.
 let buffer = "";
 
 process.stdin.setEncoding("utf8");
