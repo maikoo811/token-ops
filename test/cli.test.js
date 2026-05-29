@@ -259,10 +259,6 @@ test("install claude-hook (default smart mode) omits --trigger-mode flag", () =>
 });
 
 test("install claude-hook bakes the absolute path to node into command (GUI-launchable)", () => {
-  // GUI-launched Cursor / Claude Code inherit a minimal PATH and would not
-  // be able to resolve a bare "node" if the maintainer uses nvm or asdf.
-  // The installer must pin process.execPath so the hook fires in either
-  // context.
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-nodepath-"));
   execFileSync(process.execPath, [cli, "install", "claude-hook"], { cwd, encoding: "utf8" });
 

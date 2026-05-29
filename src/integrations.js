@@ -325,11 +325,6 @@ function renderClaudeHookSettings(settingsPath, cliPath, triggerMode = "smart", 
   if (triggerMode && triggerMode !== "smart") {
     args.push("--trigger-mode", triggerMode);
   }
-  // Use the absolute path to the node binary that ran the installer rather
-  // than the bare "node". Cursor / Claude Code launched from a GUI shortcut
-  // (Dock, Spotlight, etc.) inherit a minimal PATH that does NOT include
-  // nvm or any user shell rc, so a bare "node" would fail to resolve. The
-  // absolute path is also why .claude/settings.local.json is gitignored.
   const command = typeof nodePath === "string" && nodePath.length > 0 ? nodePath : "node";
   const hook = {
     matcher: "",
