@@ -149,6 +149,7 @@ function runInstall(values) {
     cwd: process.cwd(),
     target,
     cliPath: process.argv[1],
+    nodePath: process.execPath,
     triggerMode
   });
 

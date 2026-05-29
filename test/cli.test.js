@@ -258,6 +258,20 @@ test("install claude-hook (default smart mode) omits --trigger-mode flag", () =>
   assert.ok(!args.includes("--trigger-mode"), "default smart mode should not write the flag");
 });
 
+test("install claude-hook bakes the absolute path to node into command (GUI-launchable)", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-nodepath-"));
+  execFileSync(process.execPath, [cli, "install", "claude-hook"], { cwd, encoding: "utf8" });
+
+  const settings = JSON.parse(readFileSync(join(cwd, ".claude", "settings.local.json"), "utf8"));
+  const command = settings.hooks.UserPromptSubmit[0].hooks[0].command;
+
+  assert.equal(command, process.execPath,
+    "command should be the absolute path of the node binary that ran the install");
+  assert.notEqual(command, "node", "must not fall back to bare 'node'");
+  assert.ok(command.startsWith("/") || /^[A-Z]:\\/.test(command),
+    "path must be absolute (POSIX or Windows-style)");
+});
+
 test("hook respects --trigger-mode aggressive (fires on prompts without trigger words)", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-hook-aggressive-"));
   execFileSync("git", ["init"], { cwd, stdio: "ignore" });
