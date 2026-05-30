@@ -1,17 +1,13 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-// .gitignore lines we manage. Two distinct entries because they protect
-// against different leaks:
-// - .token-ops/      — local session log (may contain prompts with secrets)
-// - .claude/settings.local.json — Claude Code hook config with an absolute
-//   `cliPath` baked in from `process.argv[1]`. Committing it would leak the
-//   maintainer's username/home path AND break the config for teammates whose
-//   node lives somewhere else.
+// Two entries with different leak vectors:
+// - .token-ops/                   session log (may contain prompts w/ secrets)
+// - .claude/settings.local.json   hook config with an absolute cliPath; would
+//                                 leak username and break teammates' configs.
 const GITIGNORE_HEADER = "# Token Ops local files";
 const GITIGNORE_ENTRIES = [".token-ops/", ".claude/settings.local.json"];
-// Legacy header used by v0.4.x installs; recognized on uninstall so older
-// gitignore blocks are cleaned up correctly.
+// Legacy header used by v0.4.x installs; recognized on uninstall.
 const GITIGNORE_LEGACY_HEADER = "# Token Ops session log";
 
 export function installIntegration({ cwd, target, cliPath, nodePath, triggerMode = "smart" }) {
@@ -60,9 +56,6 @@ export function installIntegration({ cwd, target, cliPath, nodePath, triggerMode
 function ensureGitignoreEntry(gitignorePath) {
   const existing = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
 
-  // Detect which managed entries are still missing. Substring match is fine —
-  // both entries are distinctive enough that false positives in unrelated
-  // gitignore lines are vanishingly unlikely.
   const missing = GITIGNORE_ENTRIES.filter((entry) => !existing.includes(entry));
   if (missing.length === 0) {
     return null;
@@ -90,21 +83,15 @@ function removeGitignoreEntry(gitignorePath) {
     return null;
   }
 
-  // Strip our managed block in all known shapes. Try the most specific
-  // (current full block) first, then partial-install variants, then legacy.
   let cleaned = current
-    // Current full block: header + both entries
     .replace(
       /\n*# Token Ops local files\n\.token-ops\/\n\.claude\/settings\.local\.json\n/g,
       "\n"
     )
-    // Partial install (only one entry added under our header)
     .replace(/\n*# Token Ops local files\n\.token-ops\/\n/g, "\n")
     .replace(/\n*# Token Ops local files\n\.claude\/settings\.local\.json\n/g, "\n")
-    // Legacy v0.4.x header
     .replace(/\n*# Token Ops session log\n\.token-ops\/\n/g, "\n");
 
-  // Line-by-line fallback if a user edited the block manually.
   if (GITIGNORE_ENTRIES.some((entry) => cleaned.includes(entry))) {
     const stripLines = new Set([
       ...GITIGNORE_ENTRIES,

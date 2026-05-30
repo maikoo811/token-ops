@@ -8,18 +8,9 @@ export const DEFAULT_CONTEXT = 8;
 export const MAX_FILE_BYTES = 220_000;
 export const DEFAULT_LANG = "auto";
 
-// Hard ceiling on the number of tracked files we will enumerate per call.
-// On 500k-file monorepos or slow network filesystems we'd otherwise spend
-// seconds-to-minutes inside git ls-files and the subsequent per-file reads.
 export const MAX_TRACKED_FILES = 50_000;
-// Timeout for every git invocation. Real local repos respond in <100ms;
-// 10 seconds is far beyond legitimate use and protects against hangs on
-// network-mounted or unresponsive filesystems.
 export const GIT_TIMEOUT_MS = 10_000;
 
-// Cap session.jsonl to avoid unbounded growth in aggressive hook mode.
-// Trimmed only when the size threshold is exceeded so normal usage pays
-// zero overhead per record.
 export const SESSION_LOG_MAX_BYTES = 2 * 1024 * 1024;
 export const SESSION_LOG_KEEP_LINES = 10_000;
 
@@ -86,7 +77,6 @@ const JA_TO_EN = new Map([
   ["同期", ["sync"]],
   ["非同期", ["async"]],
   ["並列", ["parallel", "concurrent"]],
-  // Project / repo structure
   ["フォルダ", ["folder", "dir", "directory"]],
   ["ディレクトリ", ["directory", "dir", "folder"]],
   ["構造", ["structure", "layout", "architecture"]],
@@ -96,24 +86,20 @@ const JA_TO_EN = new Map([
   ["整理", ["cleanup", "refactor", "reorganize"]],
   ["リファクタ", ["refactor", "refactoring"]],
   ["依存", ["dependency", "dependencies", "deps"]],
-  // Build / runtime
   ["ビルド", ["build"]],
   ["デプロイ", ["deploy", "deployment"]],
   ["環境", ["environment", "env"]],
   ["変数", ["variable", "var"]],
   ["機能", ["feature", "function"]],
-  // UI / web
   ["画面", ["page", "screen", "view"]],
   ["ページ", ["page", "view", "route"]],
   ["ルーティング", ["routing", "router", "route"]],
   ["スタイル", ["style", "css", "theme"]],
   ["状態", ["state", "store"]],
   ["コンポーネント", ["component"]],
-  // Data
   ["データベース", ["database", "db"]],
   ["スキーマ", ["schema"]],
   ["移行", ["migration", "migrate"]],
-  // Documentation / agents
   ["ドキュメント", ["docs", "documentation", "readme"]],
   ["エージェント", ["agent", "agents"]],
   ["プロンプト", ["prompt"]]
@@ -211,9 +197,6 @@ export function listHighCostFiles({ cwd, limit = 12 }) {
 }
 
 export function recordSessionEvent(cwd, event) {
-  // Opt-out for privacy-sensitive contexts (enterprise repos, prompts that
-  // may contain secrets / customer data). When set to "1", the session log
-  // is skipped entirely — token-ops report will show zero recorded events.
   if (process.env.TOKEN_OPS_DISABLE_LOG === "1") {
     return null;
   }
@@ -270,7 +253,7 @@ function trimSessionLog(cwd, path) {
     const kept = lines.slice(-SESSION_LOG_KEEP_LINES);
     writeFileSync(path, `${kept.join("\n")}\n`);
   } catch {
-    // intentionally silent (see comment above)
+    // see block comment above
   }
 }
 
@@ -326,24 +309,6 @@ export function readSavingsReport(cwd) {
   });
 }
 
-// Strip the parts of a pack that have no user-visible value when a human is
-// reading the CLI output in their terminal. Keeps only:
-//   - `## Task` (echoes what they typed — useful confirmation)
-//   - `## Token Budget` (the value proposition — saved tokens, %)
-//   - `## Relevant Files` (the "did Token Ops pick the right files" proof)
-//
-// Removed because the user already has the info, can see it in their shell
-// prompt, or it's purely LLM-oriented templating:
-//   - `## Suggested Prompt` / `## 推奨プロンプト` (LLM brief)
-//   - `## Repository` / `## リポジトリ` (cwd + branch — already in their shell)
-//   - `## Git Status` / `## Git状態` (they just made the changes themselves)
-//   - `## Keywords` / `## キーワード` (debug-only diagnostic)
-//   - `## Snippets` / `## 抜粋` (their own source code, on their own disk)
-//
-// Every removed section is essential for downstream LLM consumption (hook,
-// MCP, piped output, file output), so this function is only applied at the
-// CLI TTY layer — never to the pack that gets sent to a model or written
-// to disk.
 const TERMINAL_DROP_SECTIONS = [
   "Suggested Prompt", "推奨プロンプト",
   "Repository",       "リポジトリ",
@@ -352,18 +317,12 @@ const TERMINAL_DROP_SECTIONS = [
 ];
 
 export function simplifyForTerminal(markdown) {
-  // Remove each "drop" section in-place. The non-greedy `[\s\S]*?(?=\n## )`
-  // body match stops at the next top-level "## " heading. Every section in
-  // the pack starts with "## " so the lookahead is reliable; snippet file
-  // sub-headings use "### " and won't be confused for a section boundary.
   const headingPattern = TERMINAL_DROP_SECTIONS
     .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
     .join("|");
   const dropRegex = new RegExp(`\\n## (?:${headingPattern})\\n[\\s\\S]*?(?=\\n## )`, "g");
   let out = markdown.replace(dropRegex, "");
 
-  // Truncate at the snippets heading and append a footer telling the user
-  // how to see them when they actually need to.
   const parts = out.split(/\n## (?:Snippets|抜粋)\n/);
   if (parts.length === 1) {
     return out;
@@ -371,11 +330,6 @@ export function simplifyForTerminal(markdown) {
   return `${parts[0]}\n\n_(snippets hidden in terminal view — run with \`--full\` or pipe to a file to see them)_\n`;
 }
 
-// ANSI color helpers — applied ONLY when explicitly enabled (typically when
-// stdout is a TTY). Hook injection, MCP responses, --output file writes, and
-// piped CLI output all stay as plain markdown so downstream LLMs / scripts
-// see clean text. We hand-roll the escape codes instead of pulling in a
-// chalk-style dep — keeps Token Ops zero-runtime-deps and small.
 const ANSI = {
   reset: "\x1b[0m",
   bold: "\x1b[1m",
@@ -392,21 +346,15 @@ export function colorizeForTty(markdown, enabled = false) {
   return markdown
     .split("\n")
     .map((line) => {
-      // Top-level heading: bold + cyan ("# Token Ops Context Pack").
       if (/^# /.test(line)) {
         return `${ANSI.bold}${ANSI.cyan}${line}${ANSI.reset}`;
       }
-      // Section heading: cyan ("## Token Budget", "## Task", ...).
       if (/^## /.test(line)) {
         return `${ANSI.cyan}${line}${ANSI.reset}`;
       }
-      // Snippet file heading: dim ("### src/core.js"). Keeps focus on the
-      // budget block while still showing the structure.
       if (/^### /.test(line)) {
         return `${ANSI.dim}${line}${ANSI.reset}`;
       }
-      // Highlight any "(NN%)" — bold green. This is the headline number
-      // a reader wants to see on Estimated saved + Avoided vs whole repo.
       return line.replace(
         /\((\d+)%\)/g,
         (_, n) => `${ANSI.bold}${ANSI.green}(${n}%)${ANSI.reset}`
@@ -452,24 +400,16 @@ export function readTriggerMode(value) {
 }
 
 export function shouldInjectForPrompt(prompt, mode = DEFAULT_TRIGGER_MODE) {
-  // These two filters apply in every mode — short prompts can't usefully be
-  // packed, and self-referential prompts about Token Ops itself would loop.
   if (!prompt || prompt.length < 6) {
     return false;
   }
   if (prompt.includes("token-ops")) {
     return false;
   }
-
-  // aggressive: fire on any qualifying prompt (most automatic, fewer surprises
-  // for coding-only repos where almost every prompt is code-relevant).
   if (mode === "aggressive") {
     return true;
   }
-
-  // smart (default): require a coding-related trigger word. English uses \b
-  // boundaries so `fix` does not match `prefix`/`fixture`, etc. Japanese keeps
-  // substring matching because \b is unreliable around CJK characters.
+  // \b for English (so `fix` doesn't match `prefix`); CJK doesn't use \b reliably.
   const englishHit = /\b(?:fix|bug|add|implement|refactor|test|review|debug|change|update)\b/i.test(prompt);
   const japaneseHit = /コード|実装|修正|追加|テスト|レビュー|改善|エラー|バグ|直|不具合|動かな|壊/.test(prompt);
   return englishHit || japaneseHit;
@@ -550,19 +490,12 @@ function runGit(args, cwd) {
       timeout: GIT_TIMEOUT_MS
     });
   } catch {
-    // Catches non-zero exit (e.g. not a git repo), timeout (ETIMEDOUT),
-    // and signal kills (SIGTERM after timeout). Returning empty is correct
-    // for all of them — callers gracefully degrade with no tracked files.
     return "";
   }
 }
 
-// Validate a cwd argument that came from an untrusted-ish source (MCP client
-// tool call, Claude Code hook stdin). Throws with a specific message on
-// failure so callers can pick their own policy:
-// - MCP tools: re-throw (the caller gets a JSON-RPC error)
-// - Claude Code hook: catch and fall back to process.cwd() to stay resilient
-//   to upstream workspace-detection bugs.
+// cwd from an untrusted source (MCP arg, hook stdin). Throws on failure so
+// callers pick their own policy: MCP re-throws, hook falls back to process.cwd().
 export function validateCwd(raw) {
   let resolved;
   try {
@@ -896,10 +829,8 @@ export function estimateTokens(text) {
     return 0;
   }
 
-  // BPE tokenizers split CJK far more aggressively than they split ASCII
-  // (roughly 1 token per 1–2 CJK chars vs 1 token per ~4 ASCII chars).
-  // Counting Japanese chars separately keeps mixed-language estimates
-  // closer to reality than a single `length / 4` heuristic.
+  // BPE splits CJK far more aggressively (~1 token per 1-2 chars) than ASCII
+  // (~1 per 4). Counting separately keeps estimates closer to reality.
   const japaneseMatches = text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu);
   const japanese = japaneseMatches ? japaneseMatches.length : 0;
   const other = text.length - japanese;
