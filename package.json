@@ -1,8 +1,20 @@
 {
   "name": "token-ops",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A local Cursor plugin and CLI that reduces wasted AI coding context.",
   "type": "module",
+  "author": {
+    "name": "Maiko Kojima",
+    "email": "694169+maikoo811@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/maikoo811/token-ops#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maikoo811/token-ops.git"
+  },
+  "bugs": {
+    "url": "https://github.com/maikoo811/token-ops/issues"
+  },
   "bin": {
     "token-ops": "./bin/token-ops.js",
     "token-ops-mcp": "./mcp/server.js"
