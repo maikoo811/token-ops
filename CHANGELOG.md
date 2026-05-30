@@ -5,6 +5,23 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-05-30
+
+First release on the npm registry.
+
+### Added
+- TTY-only colorization for `token-ops pack` / `report`
+- `pack` hides LLM-only sections in TTY mode; `--full` overrides
+- `.github/workflows/publish.yml` — tag-triggered npm publish with provenance
+- `.claude/settings.local.json` auto-added to `.gitignore` on install
+- Measured Savings opens with a real CLI screenshot
+
+### Changed
+- Hook `command` pinned to absolute node path (GUI editors with nvm/asdf)
+- Symlink guard extended to `.token-ops/session.jsonl` read/write paths
+- README copy tightened across 6 sections
+- Source comment density reduced ~72% (keep WHY, drop WHAT)
+
 ## [0.4.4] — 2026-05-25
 
 ### Added
