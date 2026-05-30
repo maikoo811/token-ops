@@ -144,16 +144,8 @@ And add Token Ops as an MCP server in `~/.cursor/mcp.json` (one time):
 
 ## CLI Install
 
-From this repository:
-
 ```sh
-npm install -g .
-```
-
-Or run without installing:
-
-```sh
-npx . pack "Fix the CSV import bug"
+npm install -g token-ops
 ```
 
 ## CLI Usage
