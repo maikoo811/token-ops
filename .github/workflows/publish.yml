@@ -25,6 +25,9 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
 
+      # Trusted Publishing requires npm >= 11.5 (Node 20 ships npm 10.x).
+      - run: npm install -g npm@latest
+
       - name: Run tests on the tagged commit
         run: npm test
 
