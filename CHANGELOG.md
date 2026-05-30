@@ -5,6 +5,23 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-05-30
+
+First release published to the npm registry.
+
+### Added
+- CLI pack/report output is colorized when stdout is a TTY (bold-cyan headings, bold-green saved %); piped/file/hook/MCP paths stay plain markdown
+- `token-ops pack` in a terminal now omits LLM-only sections (Suggested Prompt, Repository, Git Status, Keywords, Snippets) — adds `--full` to opt out
+- `.github/workflows/publish.yml` for tag-triggered npm publish with sigstore provenance
+- `.claude/settings.local.json` is added to `.gitignore` on install (contains absolute paths)
+- README `Measured Savings` section now opens with a real CLI screenshot
+
+### Changed
+- `.claude/settings.local.json` `command` field now writes the absolute path to the node binary that ran `install` (was bare `"node"`). Cursor / Claude Code launched from a GUI shortcut no longer fail to resolve node when the user uses nvm / asdf
+- `readSavingsReport`, `recordSessionEvent`, and `trimSessionLog` validate `.token-ops/session.jsonl` resolves inside cwd — defends against symlink escape via the session log path
+- README copy tightened across 6 sections (intro, How it works, Cursor Plugin, Levels of Automation table, Uninstall description)
+- Source comment density reduced ~72% across `src/`, `bin/`, `mcp/` — kept WHY (threat models, design tradeoffs), dropped WHAT
+
 ## [0.4.4] — 2026-05-25
 
 ### Added
