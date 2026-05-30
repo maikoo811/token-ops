@@ -5,6 +5,11 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] — 2026-05-31
+
+### Fixed
+- `package.json` now declares `repository`, `homepage`, `bugs`, and `author` — npm can now resolve the Measured Savings screenshot path (was broken on the npm package page) and shows GitHub / Issues links in the sidebar
+
 ## [0.5.0] — 2026-05-30
 
 First release on the npm registry.
