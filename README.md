@@ -127,30 +127,9 @@ token-ops uninstall
 
 Removes only what `install` added; unrelated settings are preserved.
 
-## Your savings log
+## Detailed savings breakdown
 
-Every pack Token Ops generates is appended to `.token-ops/session.jsonl` inside the project. Two ways to inspect it:
-
-### Quick CLI summary
-
-```sh
-token-ops report
-```
-
-Sample output:
-
-```
-# Token Ops Savings Report
-
-- Runs: 59
-- Estimated saved: ~455,125 tokens
-- Generated packs: ~186,663 tokens
-- Avoided vs selected full files: ~455,125 tokens
-- Avoided vs whole repo: ~1,451,779 tokens
-- Log: ./.token-ops/session.jsonl
-```
-
-### Detailed breakdown (prompt-type aggregation)
+`token-ops report` (covered in Verify above) gives the aggregate numbers. For a per-prompt-type breakdown (and an approximate USD cost saved at Claude API list prices), run:
 
 ```sh
 node /path/to/token-ops/docs/session-stats.mjs
