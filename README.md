@@ -75,101 +75,57 @@ A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pa
 - **Rough estimates.** Token counts are approximated from character length. Per-prompt-type figures come from a small sample — trust the aggregate more than the breakdown.
 - **Quality is preserved.** Token Ops only *adds* context to the conversation. The AI keeps all its tools, so it can read more files when the pack doesn't cover everything.
 
-### Verify on your own session
+## Quick Start
 
-After installing the hook and using Claude Code for a while, see [**Your savings log**](#your-savings-log) for how to inspect your own data.
+> 💡 **Easiest: ask your AI.** Paste this in Claude Code, Cursor, or any AI tool with shell access:
+> `Install Token Ops in this project: https://github.com/maikoo811/token-ops`
+>
+> The AI reads this README and runs the install for you. Follow the manual steps below if that doesn't work.
 
-## Cursor Plugin
-
-On the [Cursor Marketplace](https://cursor.com/marketplace). Includes the MCP server, a rule that calls `build_compact_context` first, and the tools below. See **Levels of Automation**.
-
-## MCP Tools
-
-- `build_compact_context`: create a small task-focused context pack
-- `estimate_context_cost`: estimate selected-file and whole-repo context cost
-- `list_high_cost_files`: find tracked files that are expensive to put in context
-- `report_saved_tokens`: show the local saved-token report
-
-## Levels of Automation
-
-Pick by editor and how much setup you want:
-
-| Level | Editor | Setup | What happens per prompt |
-|---|---|---|---|
-| **★★★★ Pre-injection** | Claude Code | `token-ops install claude-hook` | A hook prepends a compact pack to every prompt. Works even if the model would skip the tool. |
-| **★★★ One-click plugin** | Cursor (Marketplace) | One click (once published) | Agent is told to call `build_compact_context` first. |
-| **★★ Global rule** | Cursor | Paste the rule into `Settings → Rules → User Rules` | Same as ★★★ but rule-based, applies to every project. |
-| **★ Per-project rule** | Cursor | `token-ops install cursor` | Same as ★★ but scoped to one project. |
-| **Manual** | Any | None | Type `Use build_compact_context for: <task>` in chat. |
-
-> ★★★★ also supports `--trigger-mode aggressive` to fire on every prompt ≥ 6 chars (default `smart` requires a coding keyword).
-
-### Picking a level
-
-- **You only use Claude Code** → Level ★★★★. Strongest, simplest.
-- **You only use Cursor** → Wait for ★★★ Marketplace install (one click), or do ★★ now (paste once).
-- **Mixed editors** → ★★★★ for Claude Code, ★★ for Cursor.
-- **One-off trial in a single repo** → Manual or ★.
-
-### Global Cursor rule (copy-paste)
-
-For Level ★★, paste this into `Cursor Settings → Rules → User Rules`:
-
-```
-Before broad repository exploration, large file reads, or noisy test-log analysis, use Token Ops if its MCP tools are available.
-
-Prefer this order:
-1. Call build_compact_context for the current task.
-2. Use the returned snippets and token budget before reading more files.
-3. Call list_high_cost_files before opening large files, generated files, lockfiles, or logs.
-4. Call report_saved_tokens when the user asks about cost, tokens, usage, or savings.
-
-Avoid reading broad repository context until Token Ops output is insufficient for the task.
-```
-
-And add Token Ops as an MCP server in `~/.cursor/mcp.json` (one time):
-
-```json
-{
-  "mcpServers": {
-    "token-ops": {
-      "command": "/absolute/path/to/node",
-      "args": ["/absolute/path/to/token-ops/mcp/server.js"]
-    }
-  }
-}
-```
-
-> Use an absolute path to `node` — Cursor GUI subprocesses do not inherit nvm's `PATH`.
-
-## CLI Install
+### 1. Install the CLI
 
 ```sh
 npm install -g token-ops
 ```
 
-## CLI Usage
-
-Inside any git project:
+### 2. Wire Token Ops into your project
 
 ```sh
-token-ops pack "Fix the CSV import bug"   # generate a context pack
-token-ops report                          # show the cumulative saved-token report
+cd /path/to/your-project
+token-ops install
 ```
 
-Run `token-ops --help` for the full command list (`cost`, `high-cost-files`, `install`, `uninstall`, `hook`).
+Default installs the Claude Code hook, Cursor rule, and Codex `AGENTS.md` block. To install only one:
 
-## One-command Editor Setup
+- `token-ops install claude-hook` — Claude Code hook only (recommended for Claude Code users)
+- `token-ops install cursor` — Cursor rule only
+- `token-ops install codex` — Codex `AGENTS.md` block only
 
-Inside the project you want Token Ops in:
+Add `--trigger-mode aggressive` to `claude-hook` to fire on every prompt ≥ 6 chars (default `smart` requires a coding keyword).
+
+### 3. Restart your editor
+
+Claude Code, Cursor, and similar editors read hook / MCP configuration at startup. Quit (`Cmd+Q` on macOS) and reopen the project.
+
+### 4. Verify it's working
+
+Use your editor normally. After a few coding-action prompts (`fix...`, `refactor...`, `バグ...`, etc.), run:
 
 ```sh
-token-ops install                                          # all editors (Claude, Cursor, Codex)
-token-ops install claude-hook --trigger-mode aggressive    # Claude Code only, fires on every prompt
-token-ops uninstall                                        # clean removal
+token-ops report
 ```
 
-`uninstall` removes only what `install` added. Unrelated settings stay. Run `token-ops install --help` for the full list of targets.
+`Runs: N` with N > 0 means it's firing.
+
+![token-ops report sample output](assets/screenshots/report-sample.png)
+
+### Remove later
+
+```sh
+token-ops uninstall
+```
+
+Removes only what `install` added; unrelated settings are preserved.
 
 ## Your savings log
 
@@ -220,6 +176,62 @@ Sample output:
 ```
 
 The script is zero-dependency Node 18+. It filters known test-fixture prompts (so `npm test` runs don't pollute your aggregate) and writes nothing — read-only.
+
+## Reference
+
+### Levels of Automation
+
+Pick by editor and how much setup you want:
+
+| Level | Editor | Setup | What happens per prompt |
+|---|---|---|---|
+| **★★★★ Pre-injection** | Claude Code | `token-ops install claude-hook` | A hook prepends a compact pack to every prompt. Works even if the model would skip the tool. |
+| **★★★ One-click plugin** | Cursor (Marketplace) | One click (once published) | Agent is told to call `build_compact_context` first. |
+| **★★ Global rule** | Cursor | Paste the rule into `Settings → Rules → User Rules` | Same as ★★★ but rule-based, applies to every project. |
+| **★ Per-project rule** | Cursor | `token-ops install cursor` | Same as ★★ but scoped to one project. |
+| **Manual** | Any | None | Type `Use build_compact_context for: <task>` in chat. |
+
+### Cursor Plugin
+
+On the [Cursor Marketplace](https://cursor.com/marketplace). Includes the MCP server, a rule that calls `build_compact_context` first, and the four MCP tools below.
+
+### MCP Tools
+
+- `build_compact_context`: create a small task-focused context pack
+- `estimate_context_cost`: estimate selected-file and whole-repo context cost
+- `list_high_cost_files`: find tracked files that are expensive to put in context
+- `report_saved_tokens`: show the local saved-token report
+
+### Global Cursor rule (copy-paste)
+
+For Level ★★, paste this into `Cursor Settings → Rules → User Rules`:
+
+```
+Before broad repository exploration, large file reads, or noisy test-log analysis, use Token Ops if its MCP tools are available.
+
+Prefer this order:
+1. Call build_compact_context for the current task.
+2. Use the returned snippets and token budget before reading more files.
+3. Call list_high_cost_files before opening large files, generated files, lockfiles, or logs.
+4. Call report_saved_tokens when the user asks about cost, tokens, usage, or savings.
+
+Avoid reading broad repository context until Token Ops output is insufficient for the task.
+```
+
+And add Token Ops as an MCP server in `~/.cursor/mcp.json` (one time):
+
+```json
+{
+  "mcpServers": {
+    "token-ops": {
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/token-ops/mcp/server.js"]
+    }
+  }
+}
+```
+
+> Use an absolute path to `node` — Cursor GUI subprocesses do not inherit nvm's `PATH`.
 
 ## Advanced
 
