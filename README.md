@@ -75,22 +75,90 @@ A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pa
 - **Rough estimates.** Token counts are approximated from character length. Per-prompt-type figures come from a small sample — trust the aggregate more than the breakdown.
 - **Quality is preserved.** Token Ops only *adds* context to the conversation. The AI keeps all its tools, so it can read more files when the pack doesn't cover everything.
 
-### Verify on your own session
+## Quick Start
 
-After installing the hook and using Claude Code for a while, see [**Your savings log**](#your-savings-log) for how to inspect your own data.
+> 💡 **Easiest: ask your AI.** Paste this in Claude Code, Cursor, or any AI tool with shell access:
+> `Install Token Ops in this project: https://github.com/maikoo811/token-ops`
+>
+> The AI reads this README and runs the install for you. Follow the manual steps below if that doesn't work.
 
-## Cursor Plugin
+### 1. Install the CLI
 
-On the [Cursor Marketplace](https://cursor.com/marketplace). Includes the MCP server, a rule that calls `build_compact_context` first, and the tools below. See **Levels of Automation**.
+```sh
+npm install -g token-ops
+```
 
-## MCP Tools
+### 2. Wire Token Ops into your project
 
-- `build_compact_context`: create a small task-focused context pack
-- `estimate_context_cost`: estimate selected-file and whole-repo context cost
-- `list_high_cost_files`: find tracked files that are expensive to put in context
-- `report_saved_tokens`: show the local saved-token report
+```sh
+cd /path/to/your-project
+token-ops install
+```
 
-## Levels of Automation
+Default installs the Claude Code hook, Cursor rule, and Codex `AGENTS.md` block. To install only one:
+
+- `token-ops install claude-hook` — Claude Code hook only (recommended for Claude Code users)
+- `token-ops install cursor` — Cursor rule only
+- `token-ops install codex` — Codex `AGENTS.md` block only
+
+Add `--trigger-mode aggressive` to `claude-hook` to fire on every prompt ≥ 6 chars (default `smart` requires a coding keyword).
+
+### 3. Restart your editor
+
+Claude Code, Cursor, and similar editors read hook / MCP configuration at startup. Quit (`Cmd+Q` on macOS) and reopen the project.
+
+### 4. Verify it's working
+
+Use your editor normally. After a few coding-action prompts (`fix...`, `refactor...`, `バグ...`, etc.), run:
+
+```sh
+token-ops report
+```
+
+`Runs: N` with N > 0 means it's firing.
+
+![token-ops report sample output](assets/screenshots/report-sample.png)
+
+### Remove later
+
+```sh
+token-ops uninstall
+```
+
+Removes only what `install` added; unrelated settings are preserved.
+
+## Detailed savings breakdown
+
+`token-ops report` (covered in Verify above) gives the aggregate numbers. For a per-prompt-type breakdown (and an approximate USD cost saved at Claude API list prices), run:
+
+```sh
+node /path/to/token-ops/docs/session-stats.mjs
+```
+
+Sample output:
+
+```
+## Aggregate
+
+- Hook firings: 35
+- Generated packs: ~97,000 tokens
+- Equivalent full reads of the same ranked files: ~406,000 tokens
+- Avoided: ~309,000 tokens
+- Approx Sonnet 4.5 input cost saved: ~$0.93
+- Approx Opus 4.7 input cost saved: ~$4.63
+
+## By prompt type (median per firing)
+| Prompt type | Median pack | Median saved |
+|---|---|---|
+| Question / clarification | ~2,967 tokens | ~9,392 tokens |
+| ... |
+```
+
+The script is zero-dependency Node 18+. It filters known test-fixture prompts (so `npm test` runs don't pollute your aggregate) and writes nothing — read-only.
+
+## Reference
+
+### Levels of Automation
 
 Pick by editor and how much setup you want:
 
@@ -102,14 +170,16 @@ Pick by editor and how much setup you want:
 | **★ Per-project rule** | Cursor | `token-ops install cursor` | Same as ★★ but scoped to one project. |
 | **Manual** | Any | None | Type `Use build_compact_context for: <task>` in chat. |
 
-> ★★★★ also supports `--trigger-mode aggressive` to fire on every prompt ≥ 6 chars (default `smart` requires a coding keyword).
+### Cursor Plugin
 
-### Picking a level
+On the [Cursor Marketplace](https://cursor.com/marketplace). Includes the MCP server, a rule that calls `build_compact_context` first, and the four MCP tools below.
 
-- **You only use Claude Code** → Level ★★★★. Strongest, simplest.
-- **You only use Cursor** → Wait for ★★★ Marketplace install (one click), or do ★★ now (paste once).
-- **Mixed editors** → ★★★★ for Claude Code, ★★ for Cursor.
-- **One-off trial in a single repo** → Manual or ★.
+### MCP Tools
+
+- `build_compact_context`: create a small task-focused context pack
+- `estimate_context_cost`: estimate selected-file and whole-repo context cost
+- `list_high_cost_files`: find tracked files that are expensive to put in context
+- `report_saved_tokens`: show the local saved-token report
 
 ### Global Cursor rule (copy-paste)
 
@@ -141,85 +211,6 @@ And add Token Ops as an MCP server in `~/.cursor/mcp.json` (one time):
 ```
 
 > Use an absolute path to `node` — Cursor GUI subprocesses do not inherit nvm's `PATH`.
-
-## CLI Install
-
-```sh
-npm install -g token-ops
-```
-
-## CLI Usage
-
-Inside any git project:
-
-```sh
-token-ops pack "Fix the CSV import bug"   # generate a context pack
-token-ops report                          # show the cumulative saved-token report
-```
-
-Run `token-ops --help` for the full command list (`cost`, `high-cost-files`, `install`, `uninstall`, `hook`).
-
-## One-command Editor Setup
-
-Inside the project you want Token Ops in:
-
-```sh
-token-ops install                                          # all editors (Claude, Cursor, Codex)
-token-ops install claude-hook --trigger-mode aggressive    # Claude Code only, fires on every prompt
-token-ops uninstall                                        # clean removal
-```
-
-`uninstall` removes only what `install` added. Unrelated settings stay. Run `token-ops install --help` for the full list of targets.
-
-## Your savings log
-
-Every pack Token Ops generates is appended to `.token-ops/session.jsonl` inside the project. Two ways to inspect it:
-
-### Quick CLI summary
-
-```sh
-token-ops report
-```
-
-Sample output:
-
-```
-# Token Ops Savings Report
-
-- Runs: 59
-- Estimated saved: ~455,125 tokens
-- Generated packs: ~186,663 tokens
-- Avoided vs selected full files: ~455,125 tokens
-- Avoided vs whole repo: ~1,451,779 tokens
-- Log: ./.token-ops/session.jsonl
-```
-
-### Detailed breakdown (prompt-type aggregation)
-
-```sh
-node /path/to/token-ops/docs/session-stats.mjs
-```
-
-Sample output:
-
-```
-## Aggregate
-
-- Hook firings: 35
-- Generated packs: ~97,000 tokens
-- Equivalent full reads of the same ranked files: ~406,000 tokens
-- Avoided: ~309,000 tokens
-- Approx Sonnet 4.5 input cost saved: ~$0.93
-- Approx Opus 4.7 input cost saved: ~$4.63
-
-## By prompt type (median per firing)
-| Prompt type | Median pack | Median saved |
-|---|---|---|
-| Question / clarification | ~2,967 tokens | ~9,392 tokens |
-| ... |
-```
-
-The script is zero-dependency Node 18+. It filters known test-fixture prompts (so `npm test` runs don't pollute your aggregate) and writes nothing — read-only.
 
 ## Advanced
 
