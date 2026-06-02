@@ -34,7 +34,7 @@ import {
   toPositiveInt,
   validateCwd
 } from "../src/core.js";
-import { installIntegration, uninstallIntegration } from "../src/integrations.js";
+import { installIntegration, renderCursorRule, uninstallIntegration } from "../src/integrations.js";
 
 const args = process.argv.slice(2);
 const command = args.shift();
@@ -129,6 +129,8 @@ function runInstall(values) {
     return;
   }
 
+  const global = values.includes("--global");
+
   const triggerModeIndex = values.findIndex((value) => value === "--trigger-mode");
   const triggerMode = triggerModeIndex >= 0
     ? readTriggerMode(readOptionValue(values, triggerModeIndex + 1, "--trigger-mode"))
@@ -139,15 +141,27 @@ function runInstall(values) {
     target,
     cliPath: process.argv[1],
     nodePath: process.execPath,
-    triggerMode
+    triggerMode,
+    global
   });
 
-  console.log(`Installed token-ops integration:\n${installed.map((file) => `- ${file}`).join("\n")}`);
+  const scope = global ? "user-wide" : "project-scoped";
+  console.log(`Installed token-ops integration (${scope}):\n${installed.map((file) => `- ${file}`).join("\n")}`);
 
   if (installed.includes(".claude/settings.local.json")) {
     console.log(
       "\nNote: .claude/settings.local.json was added to .gitignore — it contains an absolute\n" +
       "      path to this machine's node binary and should stay local."
+    );
+  }
+
+  if (global && (target === "all" || target === "cursor")) {
+    console.log(
+      "\nNote: Cursor User Rules cannot be installed from disk. Paste this once into\n" +
+      "      Cursor Settings → Rules → User Rules:\n\n" +
+      "------------------------------------------------------------\n" +
+      renderCursorRule() +
+      "------------------------------------------------------------"
     );
   }
 }
@@ -159,9 +173,12 @@ function runUninstall(values) {
     return;
   }
 
+  const global = values.includes("--global");
+
   const removed = uninstallIntegration({
     cwd: process.cwd(),
-    target
+    target,
+    global
   });
 
   if (removed.length === 0) {
@@ -364,6 +381,10 @@ Options:
   --trigger-mode <smart|aggressive>  Hook firing policy. smart (default) requires a
                                   coding keyword; aggressive fires on any prompt that
                                   is at least 6 chars and not self-referential
+  --global                        (install / uninstall) Write to your home directory
+                                  (~/.claude/, ~/.cursor/) instead of the current
+                                  project — applies the integration to all projects
+                                  at once. Not supported for the codex target.
   -h, --help                      Show help
 `);
 }

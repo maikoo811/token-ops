@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 
 // Two entries with different leak vectors:
 // - .token-ops/                   session log (may contain prompts w/ secrets)
@@ -10,44 +11,62 @@ const GITIGNORE_ENTRIES = [".token-ops/", ".claude/settings.local.json"];
 // Legacy header used by v0.4.x installs; recognized on uninstall.
 const GITIGNORE_LEGACY_HEADER = "# Token Ops session log";
 
-export function installIntegration({ cwd, target, cliPath, nodePath, triggerMode = "smart" }) {
+export function installIntegration({ cwd, target, cliPath, nodePath, triggerMode = "smart", global = false }) {
   const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex"]);
 
   if (!validTargets.has(target)) {
     throw new Error("install target must be one of: all, claude, claude-hook, cursor, codex");
   }
 
+  if (global && target === "codex") {
+    throw new Error("--global is not supported for codex (AGENTS.md is project-scoped)");
+  }
+
   const installed = [];
+  const root = global ? homedir() : cwd;
+  // settings.local.json is host-specific (gitignored); settings.json is user-wide.
+  const claudeSettingsFile = global ? "settings.json" : "settings.local.json";
+  const displayPrefix = global ? "~" : "";
 
   if (target === "all" || target === "claude" || target === "claude-hook") {
-    const skillDir = join(cwd, ".claude", "skills", "token-ops");
+    const skillDir = join(root, ".claude", "skills", "token-ops");
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, "SKILL.md"), renderClaudeSkill(cliPath));
-    installed.push(".claude/skills/token-ops/SKILL.md");
+    installed.push(`${displayPrefix}/.claude/skills/token-ops/SKILL.md`.replace(/^\//, ""));
   }
 
   if (target === "all" || target === "claude-hook") {
-    const settingsPath = join(cwd, ".claude", "settings.local.json");
-    mkdirSync(join(cwd, ".claude"), { recursive: true });
+    const settingsPath = join(root, ".claude", claudeSettingsFile);
+    mkdirSync(join(root, ".claude"), { recursive: true });
     writeFileSync(settingsPath, renderClaudeHookSettings(settingsPath, cliPath, triggerMode, nodePath));
-    installed.push(".claude/settings.local.json");
+    installed.push(`${displayPrefix}/.claude/${claudeSettingsFile}`.replace(/^\//, ""));
   }
 
   if (target === "all" || target === "cursor") {
-    const ruleDir = join(cwd, ".cursor", "rules");
-    mkdirSync(ruleDir, { recursive: true });
-    writeFileSync(join(ruleDir, "token-ops.mdc"), renderCursorRule());
-    installed.push(".cursor/rules/token-ops.mdc");
+    if (global) {
+      // User Rules are GUI-only; only the MCP entry can be installed from disk.
+      const mcpPath = join(root, ".cursor", "mcp.json");
+      mkdirSync(join(root, ".cursor"), { recursive: true });
+      writeFileSync(mcpPath, renderCursorGlobalMcp(mcpPath, cliPath, nodePath));
+      installed.push("~/.cursor/mcp.json");
+    } else {
+      const ruleDir = join(cwd, ".cursor", "rules");
+      mkdirSync(ruleDir, { recursive: true });
+      writeFileSync(join(ruleDir, "token-ops.mdc"), renderCursorRule());
+      installed.push(".cursor/rules/token-ops.mdc");
+    }
   }
 
-  if (target === "all" || target === "codex") {
+  if (!global && (target === "all" || target === "codex")) {
     writeFileSync(join(cwd, "AGENTS.md"), mergeCodexInstructions(join(cwd, "AGENTS.md")));
     installed.push("AGENTS.md");
   }
 
-  const gitignoreResult = ensureGitignoreEntry(join(cwd, ".gitignore"));
-  if (gitignoreResult) {
-    installed.push(gitignoreResult);
+  if (!global) {
+    const gitignoreResult = ensureGitignoreEntry(join(cwd, ".gitignore"));
+    if (gitignoreResult) {
+      installed.push(gitignoreResult);
+    }
   }
 
   return installed;
@@ -118,55 +137,70 @@ function removeGitignoreEntry(gitignorePath) {
   return ".gitignore (Token Ops entries removed)";
 }
 
-export function uninstallIntegration({ cwd, target }) {
+export function uninstallIntegration({ cwd, target, global = false }) {
   const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex"]);
 
   if (!validTargets.has(target)) {
     throw new Error("uninstall target must be one of: all, claude, claude-hook, cursor, codex");
   }
 
+  if (global && target === "codex") {
+    throw new Error("--global is not supported for codex (AGENTS.md is project-scoped)");
+  }
+
   const removed = [];
+  const root = global ? homedir() : cwd;
+  const claudeSettingsFile = global ? "settings.json" : "settings.local.json";
+  const displayPrefix = global ? "~" : "";
 
   if (target === "all" || target === "claude" || target === "claude-hook") {
-    const skillPath = join(cwd, ".claude", "skills", "token-ops", "SKILL.md");
+    const skillPath = join(root, ".claude", "skills", "token-ops", "SKILL.md");
     if (existsSync(skillPath)) {
       rmSync(skillPath);
-      tryRemoveEmptyDir(join(cwd, ".claude", "skills", "token-ops"));
-      tryRemoveEmptyDir(join(cwd, ".claude", "skills"));
-      removed.push(".claude/skills/token-ops/SKILL.md");
+      tryRemoveEmptyDir(join(root, ".claude", "skills", "token-ops"));
+      tryRemoveEmptyDir(join(root, ".claude", "skills"));
+      removed.push(`${displayPrefix}/.claude/skills/token-ops/SKILL.md`.replace(/^\//, ""));
     }
   }
 
   if (target === "all" || target === "claude-hook") {
-    const settingsPath = join(cwd, ".claude", "settings.local.json");
-    const settingsResult = stripTokenOpsHook(settingsPath);
+    const settingsPath = join(root, ".claude", claudeSettingsFile);
+    const settingsResult = stripTokenOpsHook(settingsPath, displayPrefix);
     if (settingsResult) {
       removed.push(settingsResult);
     }
   }
 
   if (target === "all" || target === "claude" || target === "claude-hook") {
-    tryRemoveEmptyDir(join(cwd, ".claude"));
+    tryRemoveEmptyDir(join(root, ".claude"));
   }
 
   if (target === "all" || target === "cursor") {
-    const rulePath = join(cwd, ".cursor", "rules", "token-ops.mdc");
-    if (existsSync(rulePath)) {
-      rmSync(rulePath);
-      tryRemoveEmptyDir(join(cwd, ".cursor", "rules"));
-      tryRemoveEmptyDir(join(cwd, ".cursor"));
-      removed.push(".cursor/rules/token-ops.mdc");
+    if (global) {
+      const mcpPath = join(root, ".cursor", "mcp.json");
+      const mcpResult = stripTokenOpsFromCursorMcp(mcpPath);
+      if (mcpResult) {
+        removed.push(mcpResult);
+      }
+    } else {
+      const rulePath = join(cwd, ".cursor", "rules", "token-ops.mdc");
+      if (existsSync(rulePath)) {
+        rmSync(rulePath);
+        tryRemoveEmptyDir(join(cwd, ".cursor", "rules"));
+        tryRemoveEmptyDir(join(cwd, ".cursor"));
+        removed.push(".cursor/rules/token-ops.mdc");
+      }
     }
   }
 
-  if (target === "all" || target === "codex") {
+  if (!global && (target === "all" || target === "codex")) {
     const agentsResult = stripTokenOpsAgentsBlock(join(cwd, "AGENTS.md"));
     if (agentsResult) {
       removed.push(agentsResult);
     }
   }
 
-  if (target === "all") {
+  if (!global && target === "all") {
     const gitignoreResult = removeGitignoreEntry(join(cwd, ".gitignore"));
     if (gitignoreResult) {
       removed.push(gitignoreResult);
@@ -176,7 +210,7 @@ export function uninstallIntegration({ cwd, target }) {
   return removed;
 }
 
-function stripTokenOpsHook(settingsPath) {
+function stripTokenOpsHook(settingsPath, displayPrefix = "") {
   if (!existsSync(settingsPath)) {
     return null;
   }
@@ -212,13 +246,58 @@ function stripTokenOpsHook(settingsPath) {
     delete settings.hooks;
   }
 
+  const fileName = settingsPath.endsWith("settings.local.json") ? "settings.local.json" : "settings.json";
+  const label = `${displayPrefix}/.claude/${fileName}`.replace(/^\//, "");
+
   if (Object.keys(settings).length === 0) {
     rmSync(settingsPath);
-    return ".claude/settings.local.json (deleted)";
+    return `${label} (deleted)`;
   }
 
   writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
-  return ".claude/settings.local.json (token-ops hook removed)";
+  return `${label} (token-ops hook removed)`;
+}
+
+// MCP server path is derived from the CLI path (sibling `mcp/server.js`).
+function renderCursorGlobalMcp(mcpJsonPath, cliPath, nodePath) {
+  const existing = existsSync(mcpJsonPath)
+    ? safeReadJson(mcpJsonPath, "Cursor mcp.json")
+    : {};
+  existing.mcpServers = existing.mcpServers || {};
+  const mcpServerPath = join(dirname(dirname(cliPath)), "mcp", "server.js");
+  existing.mcpServers["token-ops"] = {
+    command: typeof nodePath === "string" && nodePath.length > 0 ? nodePath : "node",
+    args: [mcpServerPath]
+  };
+  return `${JSON.stringify(existing, null, 2)}\n`;
+}
+
+function stripTokenOpsFromCursorMcp(mcpJsonPath) {
+  if (!existsSync(mcpJsonPath)) {
+    return null;
+  }
+  const settings = safeReadJson(mcpJsonPath, "Cursor mcp.json");
+  if (!settings.mcpServers || !settings.mcpServers["token-ops"]) {
+    return null;
+  }
+  delete settings.mcpServers["token-ops"];
+  if (Object.keys(settings.mcpServers).length === 0) {
+    delete settings.mcpServers;
+  }
+  if (Object.keys(settings).length === 0) {
+    rmSync(mcpJsonPath);
+    return "~/.cursor/mcp.json (deleted)";
+  }
+  writeFileSync(mcpJsonPath, `${JSON.stringify(settings, null, 2)}\n`);
+  return "~/.cursor/mcp.json (token-ops entry removed)";
+}
+
+function safeReadJson(path, label) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    throw new Error(`${path} is not valid JSON (${label})`);
+  }
 }
 
 function stripTokenOpsAgentsBlock(path) {

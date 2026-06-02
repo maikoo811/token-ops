@@ -95,13 +95,24 @@ cd /path/to/your-project
 token-ops install
 ```
 
-Default installs the Claude Code hook, Cursor rule, and Codex `AGENTS.md` block. To install only one:
+Default installs hooks/rules for Claude Code, Cursor, and Codex. To install only one:
 
-- `token-ops install claude-hook` — Claude Code hook only (recommended for Claude Code users)
-- `token-ops install cursor` — Cursor rule only
-- `token-ops install codex` — Codex `AGENTS.md` block only
+- `token-ops install claude-hook` — Claude Code hook
+- `token-ops install cursor` — Cursor rule
+- `token-ops install codex` — Codex `AGENTS.md`
 
-Add `--trigger-mode aggressive` to `claude-hook` to fire on every prompt ≥ 6 chars (default `smart` requires a coding keyword).
+Add `--trigger-mode aggressive` to `claude-hook` to fire on any prompt ≥ 6 chars (default requires a coding keyword).
+
+### Install globally (optional)
+
+Add `--global` to install user-wide (writes to `~/.claude/`, `~/.cursor/`). Token Ops then fires in every project, no per-project install needed.
+
+```sh
+token-ops install --global
+token-ops install claude-hook --global
+```
+
+Codex (AGENTS.md) is project-only. Cursor User Rules require a manual paste — the command prints the text to copy.
 
 ### 3. Restart your editor
 
@@ -123,6 +134,7 @@ token-ops report
 
 ```sh
 token-ops uninstall
+token-ops uninstall --global
 ```
 
 Removes only what `install` added; unrelated settings are preserved.
