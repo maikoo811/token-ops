@@ -258,6 +258,91 @@ test("install claude-hook (default smart mode) omits --trigger-mode flag", () =>
   assert.ok(!args.includes("--trigger-mode"), "default smart mode should not write the flag");
 });
 
+test("install --global writes to fake HOME instead of cwd", () => {
+  // Use HOME override so the install lands in a tmpdir, not the maintainer's
+  // real ~/.claude. Project cwd is a separate tmpdir to confirm it stays empty.
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-global-cwd-"));
+  const fakeHome = mkdtempSync(join(tmpdir(), "token-ops-global-home-"));
+
+  const out = execFileSync(
+    process.execPath,
+    [cli, "install", "claude-hook", "--global"],
+    { cwd, encoding: "utf8", env: { ...process.env, HOME: fakeHome } }
+  );
+
+  // Global install: files land in HOME, NOT in the project cwd
+  assert.equal(existsSync(join(fakeHome, ".claude", "settings.json")), true,
+    "global hook should write to ~/.claude/settings.json");
+  assert.equal(existsSync(join(fakeHome, ".claude", "skills", "token-ops", "SKILL.md")), true,
+    "global SKILL should write to ~/.claude/skills/token-ops/");
+  assert.equal(existsSync(join(cwd, ".claude")), false,
+    "global install must not touch the project cwd");
+  assert.equal(existsSync(join(cwd, ".gitignore")), false,
+    "global install must not touch project .gitignore");
+
+  assert.match(out, /user-wide/, "output should label the scope as user-wide");
+});
+
+test("uninstall --global removes the global hook + leaves project files intact", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-global-uninstall-cwd-"));
+  const fakeHome = mkdtempSync(join(tmpdir(), "token-ops-global-uninstall-home-"));
+  const env = { ...process.env, HOME: fakeHome };
+
+  // Pre-state: install both project-scoped (in cwd) and global (in HOME)
+  execFileSync(process.execPath, [cli, "install", "claude-hook"], { cwd, encoding: "utf8", env });
+  execFileSync(process.execPath, [cli, "install", "claude-hook", "--global"], { cwd, encoding: "utf8", env });
+
+  // Both exist
+  assert.equal(existsSync(join(cwd, ".claude", "settings.local.json")), true);
+  assert.equal(existsSync(join(fakeHome, ".claude", "settings.json")), true);
+
+  // Uninstall ONLY the global one
+  execFileSync(process.execPath, [cli, "uninstall", "claude-hook", "--global"], { cwd, encoding: "utf8", env });
+
+  assert.equal(existsSync(join(fakeHome, ".claude", "settings.json")), false,
+    "global hook should be removed");
+  assert.equal(existsSync(join(cwd, ".claude", "settings.local.json")), true,
+    "project hook must NOT be touched");
+});
+
+test("install --global codex is rejected (codex has no global concept)", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-global-codex-"));
+  const fakeHome = mkdtempSync(join(tmpdir(), "token-ops-global-codex-home-"));
+
+  assert.throws(
+    () => execFileSync(
+      process.execPath,
+      [cli, "install", "codex", "--global"],
+      { cwd, encoding: "utf8", env: { ...process.env, HOME: fakeHome }, stdio: "pipe" }
+    ),
+    /not supported for codex/
+  );
+});
+
+test("install cursor --global writes to ~/.cursor/mcp.json and prints the User Rule", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-global-cursor-cwd-"));
+  const fakeHome = mkdtempSync(join(tmpdir(), "token-ops-global-cursor-home-"));
+
+  const out = execFileSync(
+    process.execPath,
+    [cli, "install", "cursor", "--global"],
+    { cwd, encoding: "utf8", env: { ...process.env, HOME: fakeHome } }
+  );
+
+  // The MCP config file is created with token-ops registered
+  const mcpPath = join(fakeHome, ".cursor", "mcp.json");
+  assert.equal(existsSync(mcpPath), true);
+  const mcp = JSON.parse(readFileSync(mcpPath, "utf8"));
+  assert.ok(mcp.mcpServers["token-ops"], "mcp.json should declare token-ops");
+  assert.match(mcp.mcpServers["token-ops"].args[0], /mcp[\\/]+server\.js$/);
+
+  // User Rules cannot be installed via file — output prints rule text instead
+  assert.match(out, /paste this once/i);
+  assert.match(out, /User Rules/);
+  // No file-based rule should be written under project either
+  assert.equal(existsSync(join(cwd, ".cursor")), false);
+});
+
 test("install claude-hook bakes the absolute path to node into command (GUI-launchable)", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-nodepath-"));
   execFileSync(process.execPath, [cli, "install", "claude-hook"], { cwd, encoding: "utf8" });
