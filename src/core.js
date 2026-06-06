@@ -625,9 +625,6 @@ function buildSnippet(file, keywords, cwd, maxLines) {
       selectedLineIndexes.add(index);
     }
   } else {
-    // Try AST-bounded extraction for JS/TS. Falls back to the window strategy
-    // if the file isn't JS/TS, no enclosing block is found, or the extracted
-    // block would exceed `maxLines` (preserves the existing budget guarantee).
     selectedLineIndexes = astBoundedSelection(file, content, lines, matches, maxLines)
       ?? windowSelection(lines, matches, maxLines);
   }
@@ -662,8 +659,6 @@ function windowSelection(lines, matches, maxLines) {
   return set;
 }
 
-// Returns null if AST extraction can't (or shouldn't) be used. Otherwise returns
-// the set of line indexes covering the enclosing function/class for each match.
 function astBoundedSelection(file, content, lines, matches, maxLines) {
   const language = getJsLikeLanguage(file);
   if (!language) {
@@ -705,9 +700,7 @@ function looksLikeBlockStart(line) {
   return BLOCK_START_PATTERNS.some((re) => re.test(line));
 }
 
-// Walks back from a keyword hit to the nearest function/class signature, then
-// forward-matches braces to find the block end. Returns [startIdx, endIdx] or
-// null if no enclosing block can be reliably identified.
+// Returns [startIdx, endIdx], or null if no enclosing block found / hit falls outside it.
 function findEnclosingBlock(originalLines, sanitizedLines, hitLineIdx) {
   let startIdx = -1;
   for (let i = hitLineIdx; i >= 0; i -= 1) {
@@ -738,14 +731,11 @@ function findEnclosingBlock(originalLines, sanitizedLines, hitLineIdx) {
     if (endIdx !== -1) break;
   }
   if (endIdx === -1) return null;
-  // Sanity: the hit line must actually fall inside the block we found.
   if (hitLineIdx < startIdx || hitLineIdx > endIdx) return null;
   return [startIdx, endIdx];
 }
 
-// Replace string-literal / comment characters with spaces (keeping newlines)
-// so brace counting isn't confused by `"} ${"` or `// orphan }`. Preserves the
-// line-by-line structure for accurate line-number reporting.
+// Newlines preserved so line indexes stay aligned with the original content.
 function stripStringsAndComments(content) {
   let out = "";
   const n = content.length;
