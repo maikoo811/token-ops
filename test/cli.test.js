@@ -258,6 +258,91 @@ test("install claude-hook (default smart mode) omits --trigger-mode flag", () =>
   assert.ok(!args.includes("--trigger-mode"), "default smart mode should not write the flag");
 });
 
+// ---- AST-based snippet boundary detection (JS/TS) ----
+
+function setupJsRepo(seedFiles) {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-ast-"));
+  execFileSync("git", ["init"], { cwd, stdio: "ignore" });
+  for (const [name, content] of Object.entries(seedFiles)) {
+    writeFileSync(join(cwd, name), content);
+  }
+  execFileSync("git", ["add", "."], { cwd });
+  execFileSync("git", ["-c", "user.email=t@e.com", "-c", "user.name=T", "commit", "-m", "init"], { cwd, stdio: "ignore" });
+  return cwd;
+}
+
+test("AST mode: snippet contains the entire enclosing function for JS files", () => {
+  const cwd = setupJsRepo({
+    "auth.js": [
+      "// header comment",
+      "const PADDING = 1;",
+      "",
+      "export function loginUser(name) {",
+      "  if (!name) {",
+      "    throw new Error('name required');",
+      "  }",
+      "  return { name };",
+      "}",
+      "",
+      "function unrelated() {",
+      "  return 42;",
+      "}"
+    ].join("\n")
+  });
+  const output = execFileSync(process.execPath, [cli, "pack", "fix loginUser"], { cwd, encoding: "utf8" });
+  // The whole loginUser body must appear — start signature, throw line, and closing brace
+  assert.match(output, /export function loginUser\(name\)/);
+  assert.match(output, /throw new Error\('name required'\)/);
+  assert.match(output, /return \{ name \}/);
+  // The padding above (`const PADDING = 1;`) should NOT be there — AST is precise
+  assert.doesNotMatch(output, /const PADDING/);
+});
+
+test("AST mode: falls back to window mode when the function exceeds max-lines", () => {
+  // Construct a function whose body is 80 lines — larger than --max-lines 20
+  const bodyLines = Array.from({ length: 80 }, (_, i) => `  const v${i} = ${i};`).join("\n");
+  const file = `export function huge() {\n${bodyLines}\n  return loginUser('end');\n}\n`;
+  const cwd = setupJsRepo({ "huge.js": file });
+
+  const output = execFileSync(process.execPath, [cli, "pack", "fix loginUser", "--max-lines", "20"], {
+    cwd, encoding: "utf8"
+  });
+  // Window mode would center on the match (the `return loginUser('end')` line near the end);
+  // it should be present, but the function signature at line 1 should NOT (it's too far away).
+  assert.match(output, /loginUser/);
+  assert.doesNotMatch(output, /function huge\(\)/, "signature far from match should not appear under window mode");
+});
+
+test("AST mode: non-JS files still use window mode", () => {
+  const cwd = setupJsRepo({
+    "notes.md": "# Heading\n\nA mention of loginUser in prose.\n\nMore prose.\n"
+  });
+  const output = execFileSync(process.execPath, [cli, "pack", "fix loginUser"], { cwd, encoding: "utf8" });
+  assert.match(output, /loginUser/);
+  // No JS parse should have happened; the Markdown content is just snippet'd
+  assert.match(output, /# Heading/);
+});
+
+test("AST mode: braces inside strings and comments don't break the parser", () => {
+  const cwd = setupJsRepo({
+    "tricky.js": [
+      "export function loginUser(name) {",
+      "  const trap1 = '{ not a real brace }';",
+      '  const trap2 = "} another fake";',
+      "  // } orphan in comment",
+      "  /* and { another } block comment */",
+      "  return `template ${name} with } braces`;",
+      "}"
+    ].join("\n")
+  });
+  const output = execFileSync(process.execPath, [cli, "pack", "fix loginUser"], { cwd, encoding: "utf8" });
+  // The full function body up to and including the closing brace must be selected
+  assert.match(output, /export function loginUser\(name\)/);
+  assert.match(output, /template \$\{name\}/);
+  // The closing `}` must be present (proves the parser walked all the way through)
+  assert.match(output, /^\s+\d+\s+\|\s+\}\s*$/m);
+});
+
 test("install --global writes to fake HOME instead of cwd", () => {
   // Use HOME override so the install lands in a tmpdir, not the maintainer's
   // real ~/.claude. Project cwd is a separate tmpdir to confirm it stays empty.

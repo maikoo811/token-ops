@@ -617,23 +617,16 @@ function buildSnippet(file, keywords, cwd, maxLines) {
   const content = readSmallFile(absolutePath);
   const lines = content.split("\n");
   const matches = findMatchingLines(lines, keywords);
-  const selectedLineIndexes = new Set();
 
+  let selectedLineIndexes;
   if (matches.length === 0) {
+    selectedLineIndexes = new Set();
     for (let index = 0; index < Math.min(lines.length, maxLines); index += 1) {
       selectedLineIndexes.add(index);
     }
   } else {
-    for (const lineIndex of matches) {
-      const start = Math.max(0, lineIndex - DEFAULT_CONTEXT);
-      const end = Math.min(lines.length - 1, lineIndex + DEFAULT_CONTEXT);
-      for (let index = start; index <= end; index += 1) {
-        selectedLineIndexes.add(index);
-      }
-      if (selectedLineIndexes.size >= maxLines) {
-        break;
-      }
-    }
+    selectedLineIndexes = astBoundedSelection(file, content, lines, matches, maxLines)
+      ?? windowSelection(lines, matches, maxLines);
   }
 
   const selected = [...selectedLineIndexes]
@@ -649,6 +642,163 @@ function buildSnippet(file, keywords, cwd, maxLines) {
     estimatedTokens: estimateTokens(content),
     snippet: selected
   };
+}
+
+function windowSelection(lines, matches, maxLines) {
+  const set = new Set();
+  for (const lineIndex of matches) {
+    const start = Math.max(0, lineIndex - DEFAULT_CONTEXT);
+    const end = Math.min(lines.length - 1, lineIndex + DEFAULT_CONTEXT);
+    for (let index = start; index <= end; index += 1) {
+      set.add(index);
+    }
+    if (set.size >= maxLines) {
+      break;
+    }
+  }
+  return set;
+}
+
+function astBoundedSelection(file, content, lines, matches, maxLines) {
+  const language = getJsLikeLanguage(file);
+  if (!language) {
+    return null;
+  }
+  const sanitizedLines = stripStringsAndComments(content).split("\n");
+  const set = new Set();
+  for (const lineIndex of matches) {
+    const block = findEnclosingBlock(lines, sanitizedLines, lineIndex);
+    if (block === null) {
+      return null;
+    }
+    for (let i = block[0]; i <= block[1]; i += 1) {
+      set.add(i);
+      if (set.size > maxLines) {
+        return null;
+      }
+    }
+  }
+  return set.size > 0 ? set : null;
+}
+
+function getJsLikeLanguage(file) {
+  const ext = extname(file).toLowerCase();
+  if (ext === ".js" || ext === ".mjs" || ext === ".cjs" || ext === ".jsx") return "js";
+  if (ext === ".ts" || ext === ".tsx") return "ts";
+  return null;
+}
+
+const BLOCK_START_PATTERNS = [
+  /^[ \t]*(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s*\*?\s*\w+\s*\(/,
+  /^[ \t]*(?:export\s+(?:default\s+)?)?(?:const|let|var)\s+\w+\s*(?::[^=]+)?\s*=\s*(?:async\s+)?\(/,
+  /^[ \t]*(?:export\s+(?:default\s+)?)?(?:const|let|var)\s+\w+\s*(?::[^=]+)?\s*=\s*(?:async\s+)?function/,
+  /^[ \t]*(?:export\s+(?:default\s+)?)?class\s+\w+/,
+  /^[ \t]*(?:async\s+)?\w+\s*\([^)]*\)\s*{\s*$/  // method shorthand
+];
+
+function looksLikeBlockStart(line) {
+  return BLOCK_START_PATTERNS.some((re) => re.test(line));
+}
+
+// Returns [startIdx, endIdx], or null if no enclosing block found / hit falls outside it.
+function findEnclosingBlock(originalLines, sanitizedLines, hitLineIdx) {
+  let startIdx = -1;
+  for (let i = hitLineIdx; i >= 0; i -= 1) {
+    if (looksLikeBlockStart(originalLines[i])) {
+      startIdx = i;
+      break;
+    }
+  }
+  if (startIdx === -1) return null;
+
+  let depth = 0;
+  let started = false;
+  let endIdx = -1;
+  for (let i = startIdx; i < sanitizedLines.length; i += 1) {
+    const line = sanitizedLines[i];
+    for (const ch of line) {
+      if (ch === "{") {
+        depth += 1;
+        started = true;
+      } else if (ch === "}") {
+        depth -= 1;
+        if (started && depth === 0) {
+          endIdx = i;
+          break;
+        }
+      }
+    }
+    if (endIdx !== -1) break;
+  }
+  if (endIdx === -1) return null;
+  if (hitLineIdx < startIdx || hitLineIdx > endIdx) return null;
+  return [startIdx, endIdx];
+}
+
+// Newlines preserved so line indexes stay aligned with the original content.
+function stripStringsAndComments(content) {
+  let out = "";
+  const n = content.length;
+  let i = 0;
+  while (i < n) {
+    const ch = content[i];
+    const next = i + 1 < n ? content[i + 1] : "";
+
+    if (ch === "/" && next === "/") {
+      while (i < n && content[i] !== "\n") {
+        out += " ";
+        i += 1;
+      }
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      out += "  ";
+      i += 2;
+      while (i < n - 1 && !(content[i] === "*" && content[i + 1] === "/")) {
+        out += content[i] === "\n" ? "\n" : " ";
+        i += 1;
+      }
+      if (i < n - 1) { out += "  "; i += 2; }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      out += " ";
+      i += 1;
+      while (i < n && content[i] !== ch && content[i] !== "\n") {
+        if (content[i] === "\\" && i + 1 < n) { out += "  "; i += 2; }
+        else { out += " "; i += 1; }
+      }
+      if (i < n) { out += " "; i += 1; }
+      continue;
+    }
+    if (ch === "`") {
+      out += " ";
+      i += 1;
+      while (i < n && content[i] !== "`") {
+        if (content[i] === "\\" && i + 1 < n) { out += "  "; i += 2; }
+        else if (content[i] === "$" && i + 1 < n && content[i + 1] === "{") {
+          // Keep ${...} contents and braces — they participate in real brace balance
+          out += "${";
+          i += 2;
+          let depth = 1;
+          while (i < n && depth > 0) {
+            if (content[i] === "{") depth += 1;
+            else if (content[i] === "}") depth -= 1;
+            out += content[i] === "\n" ? "\n" : content[i];
+            i += 1;
+          }
+        } else {
+          out += content[i] === "\n" ? "\n" : " ";
+          i += 1;
+        }
+      }
+      if (i < n) { out += " "; i += 1; }
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
 }
 
 function readSmallFile(path) {
