@@ -323,6 +323,66 @@ test("AST mode: non-JS files still use window mode", () => {
   assert.match(output, /# Heading/);
 });
 
+test("symbol ranking: file that DEFINES a keyword outranks one that only mentions it", () => {
+  const cwd = setupJsRepo({
+    // a.js — defines extractKeywords
+    "defines.js": "export function extractKeywords(task) {\n  return task.split(/\\s+/);\n}\n",
+    // b.js — only mentions it in a comment
+    "mentions.js": "// later: investigate extractKeywords behavior\nexport const noop = () => null;\n"
+  });
+
+  const output = execFileSync(process.execPath, [cli, "pack", "fix extractKeywords"], {
+    cwd, encoding: "utf8"
+  });
+
+  // Both files are relevant, but the defining file should appear first in the
+  // Relevant Files list because of the +30 symbol boost.
+  const relevantBlock = output.split(/##\s+Relevant Files/i)[1] || "";
+  const definesPos = relevantBlock.indexOf("defines.js");
+  const mentionsPos = relevantBlock.indexOf("mentions.js");
+  assert.notEqual(definesPos, -1);
+  assert.notEqual(mentionsPos, -1);
+  assert.ok(definesPos < mentionsPos,
+    `defines.js (pos ${definesPos}) should appear before mentions.js (pos ${mentionsPos})`);
+});
+
+test("symbol ranking: TypeScript interface / type / enum names are extracted", () => {
+  const cwd = setupJsRepo({
+    "types.ts": "export interface UserAuth { id: string; }\nexport type LoginResult = boolean;\nexport enum Role { Admin, Member }\n",
+    "other.ts": "export const banana = 1;\n"
+  });
+
+  const output = execFileSync(process.execPath, [cli, "pack", "fix UserAuth"], { cwd, encoding: "utf8" });
+
+  const relevantBlock = output.split(/##\s+Relevant Files/i)[1] || "";
+  assert.match(relevantBlock, /types\.ts/);
+  // types.ts should rank above other.ts (which doesn't define the symbol)
+  const typesPos = relevantBlock.indexOf("types.ts");
+  const otherPos = relevantBlock.indexOf("other.ts");
+  if (otherPos !== -1) {
+    assert.ok(typesPos < otherPos, "types.ts should outrank other.ts");
+  }
+});
+
+test("symbol ranking: only applies to JS/TS files (no boost for Markdown)", () => {
+  const cwd = setupJsRepo({
+    "docs.md": "# extractKeywords\n\nThis document describes extractKeywords.\n",
+    "real.js": "export function extractKeywords(t) { return t; }\n"
+  });
+
+  const output = execFileSync(process.execPath, [cli, "pack", "fix extractKeywords"], {
+    cwd, encoding: "utf8"
+  });
+
+  const relevantBlock = output.split(/##\s+Relevant Files/i)[1] || "";
+  const realPos = relevantBlock.indexOf("real.js");
+  const docsPos = relevantBlock.indexOf("docs.md");
+  assert.notEqual(realPos, -1);
+  assert.notEqual(docsPos, -1);
+  // real.js (defines symbol) should outrank docs.md (only mentions)
+  assert.ok(realPos < docsPos, "real.js should outrank docs.md via symbol boost");
+});
+
 test("AST mode: braces inside strings and comments don't break the parser", () => {
   const cwd = setupJsRepo({
     "tricky.js": [

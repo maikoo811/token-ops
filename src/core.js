@@ -575,7 +575,8 @@ function rankFiles(files, keywords, changedFiles, cwd) {
         }
       }
 
-      const content = readSmallFile(join(cwd, file)).toLowerCase();
+      const rawContent = readSmallFile(join(cwd, file));
+      const content = rawContent.toLowerCase();
       for (const keyword of keywords) {
         if (content.includes(keyword)) {
           score += 8;
@@ -588,6 +589,19 @@ function rankFiles(files, keywords, changedFiles, cwd) {
         }
       }
 
+      // Symbol-defining file outranks one that only mentions the keyword.
+      const symbols = extractSymbolNames(file, rawContent);
+      for (const keyword of keywords) {
+        if (symbols.has(keyword)) {
+          score += 30;
+        }
+      }
+      for (const bridged of bridgedKeywords) {
+        if (symbols.has(bridged)) {
+          score += 20;
+        }
+      }
+
       if (/\b(test|spec)\b/i.test(file)) {
         score += 4;
       }
@@ -597,6 +611,29 @@ function rankFiles(files, keywords, changedFiles, cwd) {
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score || a.file.localeCompare(b.file))
     .map((item) => item.file);
+}
+
+const SYMBOL_PATTERNS = [
+  /(?:^|[^\w$])(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s*\*?\s*(\w+)\s*\(/g,
+  /(?:^|[^\w$])(?:export\s+(?:default\s+)?)?(?:const|let|var)\s+(\w+)\s*(?::[^=]+)?\s*=\s*(?:async\s+)?(?:\(|function\b)/g,
+  /(?:^|[^\w$])(?:export\s+(?:default\s+)?)?class\s+(\w+)/g,
+  /(?:^|[^\w$])(?:export\s+)?(?:interface|type|enum)\s+(\w+)/g
+];
+
+function extractSymbolNames(file, rawContent) {
+  if (!getJsLikeLanguage(file)) {
+    return new Set();
+  }
+  const sanitized = stripStringsAndComments(rawContent);
+  const symbols = new Set();
+  for (const pattern of SYMBOL_PATTERNS) {
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(sanitized)) !== null) {
+      symbols.add(match[1].toLowerCase());
+    }
+  }
+  return symbols;
 }
 
 function bridgeJapaneseKeywords(keywords) {
