@@ -3,7 +3,7 @@
   "name": "token-ops",
   "displayName": "Token Ops: AI Token Saver",
   "description": "Stop Cursor and Claude Code from wasting tokens on broad repo reads. Runs locally with no API key, account, or cloud backend.",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "author": {
     "name": "Maiko Kojima",
     "email": "694169+maikoo811@users.noreply.github.com"

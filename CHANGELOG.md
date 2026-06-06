@@ -5,6 +5,17 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-06-06
+
+### Added
+- `token-ops install --global` / `uninstall --global` — install user-wide to `~/.claude/` and `~/.cursor/mcp.json` so Token Ops fires in every project (codex remains project-only)
+- AST-bounded snippet extraction for JS/TS — snippet contains the whole enclosing function or class instead of an arbitrary N-line window; falls back to window mode when the block exceeds `--max-lines`
+- Symbol-aware file ranking — files that define a keyword as a function / class / type / interface / enum outrank files that only mention it
+
+### Changed
+- README Quick Start tightened: removed inline comments, removed duplicate `token-ops report` block, added screenshot of colorized report output
+- Reorganized README so install / setup come before MCP / Levels of Automation reference
+
 ## [0.5.1] — 2026-05-31
 
 ### Fixed
