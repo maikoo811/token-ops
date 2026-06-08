@@ -211,6 +211,29 @@ test("uninstall removes the .claude/settings.local.json entry it added", () => {
   assert.doesNotMatch(contents, /\.claude\/settings\.local\.json/);
 });
 
+test("install also adds .claude/skills/token-ops/SKILL.md to .gitignore", () => {
+  // SKILL.md embeds the absolute cliPath (process.argv[1]) inside its `node
+  // <path> pack` line, so committing it leaks the maintainer's username and
+  // breaks the skill for teammates whose CLI lives elsewhere. Same gitignore
+  // policy as .claude/settings.local.json.
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-gitignore-skill-"));
+  execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+  const contents = readFileSync(join(cwd, ".gitignore"), "utf8");
+  assert.match(contents, /\.claude\/skills\/token-ops\/SKILL\.md/);
+});
+
+test("uninstall removes the .claude/skills/token-ops/SKILL.md entry it added", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-gitignore-skill-uninstall-"));
+  writeFileSync(join(cwd, ".gitignore"), "node_modules/\n");
+
+  execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+  execFileSync(process.execPath, [cli, "uninstall"], { cwd, encoding: "utf8" });
+
+  const contents = readFileSync(join(cwd, ".gitignore"), "utf8");
+  assert.match(contents, /node_modules\//);
+  assert.doesNotMatch(contents, /\.claude\/skills\/token-ops\/SKILL\.md/);
+});
+
 test("install upgrades a v0.4.x-style gitignore block (legacy header + only .token-ops/)", () => {
   // Simulates a repo where token-ops was installed under v0.4.x: the old
   // block has the "session log" header and only the .token-ops/ entry.
