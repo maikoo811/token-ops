@@ -5,6 +5,11 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] — 2026-06-07
+
+### Fixed
+- `.claude/skills/token-ops/SKILL.md` is now auto-added to `.gitignore` on install (it embeds an absolute `cliPath` from `process.argv[1]`, so committing it leaks the maintainer's path and breaks teammates' configs)
+
 ## [0.6.0] — 2026-06-06
 
 ### Added

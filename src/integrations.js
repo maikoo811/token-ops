@@ -2,12 +2,14 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, wr
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-// Two entries with different leak vectors:
-// - .token-ops/                   session log (may contain prompts w/ secrets)
-// - .claude/settings.local.json   hook config with an absolute cliPath; would
-//                                 leak username and break teammates' configs.
+// Each entry embeds an absolute path or user-specific data; committing any
+// of them leaks the maintainer's environment and breaks teammates' configs.
 const GITIGNORE_HEADER = "# Token Ops local files";
-const GITIGNORE_ENTRIES = [".token-ops/", ".claude/settings.local.json"];
+const GITIGNORE_ENTRIES = [
+  ".token-ops/",
+  ".claude/settings.local.json",
+  ".claude/skills/token-ops/SKILL.md"
+];
 // Legacy header used by v0.4.x installs; recognized on uninstall.
 const GITIGNORE_LEGACY_HEADER = "# Token Ops session log";
 
@@ -103,12 +105,21 @@ function removeGitignoreEntry(gitignorePath) {
   }
 
   let cleaned = current
+    // v0.6.1+ full block (3 entries)
+    .replace(
+      /\n*# Token Ops local files\n\.token-ops\/\n\.claude\/settings\.local\.json\n\.claude\/skills\/token-ops\/SKILL\.md\n/g,
+      "\n"
+    )
+    // v0.5+ block (2 entries)
     .replace(
       /\n*# Token Ops local files\n\.token-ops\/\n\.claude\/settings\.local\.json\n/g,
       "\n"
     )
+    // partial-install combinations
     .replace(/\n*# Token Ops local files\n\.token-ops\/\n/g, "\n")
     .replace(/\n*# Token Ops local files\n\.claude\/settings\.local\.json\n/g, "\n")
+    .replace(/\n*# Token Ops local files\n\.claude\/skills\/token-ops\/SKILL\.md\n/g, "\n")
+    // v0.4.x legacy header
     .replace(/\n*# Token Ops session log\n\.token-ops\/\n/g, "\n");
 
   if (GITIGNORE_ENTRIES.some((entry) => cleaned.includes(entry))) {
