@@ -5,6 +5,12 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] — 2026-06-08
+
+### Added
+- `install` now warns when managed files (`.claude/settings.local.json`, `.claude/skills/token-ops/SKILL.md`, `.token-ops/`) are already tracked by git — prints the exact `git rm --cached` command to fix
+- `install` now prints a one-time notice when run from an nvm-managed node, reminding users to re-run install after `nvm install` (otherwise the hook's absolute node path silently breaks)
+
 ## [0.6.1] — 2026-06-07
 
 ### Fixed

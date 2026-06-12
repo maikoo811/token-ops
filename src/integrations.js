@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -454,4 +455,23 @@ function mergeCodexInstructions(path) {
 
 function shellQuote(value) {
   return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+// Empty array when cwd isn't a git repo, git isn't installed, or none tracked.
+export function findTrackedManagedFiles(cwd) {
+  try {
+    const out = execFileSync("git", ["ls-files", "--", ...GITIGNORE_ENTRIES], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 3000
+    });
+    return out.split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+export function isNvmManagedNode(nodePath) {
+  return typeof nodePath === "string" && nodePath.includes("/.nvm/versions/node/");
 }

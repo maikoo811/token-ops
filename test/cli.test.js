@@ -1,10 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { shouldInjectForPrompt } from "../src/core.js";
+import { isNvmManagedNode } from "../src/integrations.js";
 
 const cli = resolve("bin/token-ops.js");
 
@@ -424,6 +425,56 @@ test("AST mode: braces inside strings and comments don't break the parser", () =
   assert.match(output, /template \$\{name\}/);
   // The closing `}` must be present (proves the parser walked all the way through)
   assert.match(output, /^\s+\d+\s+\|\s+\}\s*$/m);
+});
+
+// ---- install diagnostics: tracked-file detection + nvm notice ----
+
+test("install warns when .claude/settings.local.json is already tracked by git", () => {
+  // Simulate a project where someone committed .claude/settings.local.json
+  // before adding Token Ops' gitignore. Token Ops should detect this and
+  // print the exact `git rm --cached` command rather than silently failing.
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-tracked-"));
+  execFileSync("git", ["init", "-q"], { cwd });
+  execFileSync("git", ["config", "user.email", "t@e.com"], { cwd });
+  execFileSync("git", ["config", "user.name", "T"], { cwd });
+  mkdirSync(join(cwd, ".claude"));
+  writeFileSync(join(cwd, ".claude", "settings.local.json"), "{}\n");
+  // Force-add: some users have a global ignore for .claude/ via core.excludesFile.
+  // The point of the test is "what if the file is tracked", not "how it got tracked".
+  execFileSync("git", ["add", "-f", ".claude/settings.local.json"], { cwd });
+  execFileSync("git", ["commit", "-q", "-m", "pre-token-ops"], { cwd });
+
+  const output = execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+
+  assert.match(output, /tracked by git/);
+  assert.match(output, /git rm --cached/);
+  assert.match(output, /\.claude\/settings\.local\.json/);
+});
+
+test("install does not show the tracked warning in a clean repo", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-clean-"));
+  execFileSync("git", ["init", "-q"], { cwd });
+
+  const output = execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+
+  assert.doesNotMatch(output, /tracked by git/);
+  assert.doesNotMatch(output, /git rm --cached/);
+});
+
+test("install does not crash in a non-git directory (skips tracked detection)", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-no-git-"));
+  // Intentionally NOT running `git init` — no .git folder
+  const output = execFileSync(process.execPath, [cli, "install"], { cwd, encoding: "utf8" });
+  assert.match(output, /Installed token-ops integration/);
+  assert.doesNotMatch(output, /tracked by git/);
+});
+
+test("isNvmManagedNode: detects nvm paths only", () => {
+  assert.equal(isNvmManagedNode("/Users/x/.nvm/versions/node/v22.20.0/bin/node"), true);
+  assert.equal(isNvmManagedNode("/usr/local/bin/node"), false);
+  assert.equal(isNvmManagedNode("/opt/homebrew/bin/node"), false);
+  assert.equal(isNvmManagedNode(""), false);
+  assert.equal(isNvmManagedNode(undefined), false);
 });
 
 test("install --global writes to fake HOME instead of cwd", () => {
