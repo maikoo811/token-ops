@@ -34,7 +34,13 @@ import {
   toPositiveInt,
   validateCwd
 } from "../src/core.js";
-import { installIntegration, renderCursorRule, uninstallIntegration } from "../src/integrations.js";
+import {
+  findTrackedManagedFiles,
+  installIntegration,
+  isNvmManagedNode,
+  renderCursorRule,
+  uninstallIntegration
+} from "../src/integrations.js";
 
 const args = process.argv.slice(2);
 const command = args.shift();
@@ -162,6 +168,30 @@ function runInstall(values) {
       "------------------------------------------------------------\n" +
       renderCursorRule() +
       "------------------------------------------------------------"
+    );
+  }
+
+  if (!global) {
+    const tracked = findTrackedManagedFiles(process.cwd());
+    if (tracked.length > 0) {
+      console.log(
+        "\n⚠️  These files are tracked by git but Token Ops just added them to .gitignore.\n" +
+        "    Git won't auto-untrack them — absolute paths inside will still be committed:\n\n" +
+        tracked.map((f) => `      ${f}`).join("\n") +
+        "\n\n    To stop tracking (one-time):\n\n" +
+        `      git rm --cached ${tracked.join(" ")}\n` +
+        "      git commit -m \"stop tracking token-ops generated files\""
+      );
+    }
+  }
+
+  if (isNvmManagedNode(process.execPath) && (target === "all" || target === "claude" || target === "claude-hook")) {
+    console.log(
+      "\nℹ️  Detected nvm-managed node at:\n" +
+      `      ${process.execPath}\n\n` +
+      "    This path is baked into the Claude Code hook config. If you upgrade node\n" +
+      "    (e.g. `nvm install`), re-run `token-ops install claude-hook` to refresh\n" +
+      "    the path — otherwise the hook will silently fail to start."
     );
   }
 }
