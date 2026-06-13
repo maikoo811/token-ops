@@ -1,5 +1,7 @@
 # Token Ops
 
+**日本語**: [README.ja.md](README.ja.md)
+
 Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Claude Code, Codex, and other MCP-compatible agents a compact task-focused context pack before they read broadly, then records an estimated saved-token report.
 
 Install once, code normally, see how much the agent avoided reading. No API key, no account, no cloud backend, no telemetry by default.
@@ -40,7 +42,7 @@ Example:
 
 ### By prompt type
 
-Prompt content is not disclosed — only the type of work each prompt represented. All numbers compare the generated pack against reading the same ranked files in full.
+Savings broken down by the kind of prompt (prompt content not disclosed).
 
 ```mermaid
 ---
