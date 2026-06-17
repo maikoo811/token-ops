@@ -116,6 +116,16 @@ token-ops install claude-hook --global
 
 Codex(AGENTS.md)はプロジェクト単位のみです。Cursor User Rulesは手動でのペーストが必要で、コマンドがペースト用のテキストを出力します。
 
+### Claude CodeでMCPツールを使えるようにする(任意)
+
+Claude Codeから「これまでどれくらいトークン節約できた?」と聞いて答えさせたり、Token Opsのツールを直接呼べるようにします。1回だけ登録:
+
+```sh
+claude mcp add token-ops token-ops-mcp
+```
+
+`claude mcp list`で確認、`claude mcp remove token-ops`で解除。
+
 ### 3. エディタを再起動
 
 Claude Code・Cursorなどのエディタは起動時にフック・MCPの設定を読み込みます。エディタを完全終了(macOSなら`Cmd+Q`)してからプロジェクトを開き直してください。
@@ -131,6 +141,10 @@ token-ops report
 `Runs: N`のNが0より大きければ発火しています。
 
 ![token-ops reportの出力例](assets/screenshots/report-sample.png)
+
+またはチャットでAIに直接聞いても見られます:
+
+> 「Token Opsでこれまでどれくらいトークン節約できた?」
 
 ### アンインストール
 
