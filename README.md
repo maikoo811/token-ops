@@ -116,6 +116,16 @@ token-ops install claude-hook --global
 
 Codex (AGENTS.md) is project-only. Cursor User Rules require a manual paste — the command prints the text to copy.
 
+### Enable MCP tools in Claude Code (optional)
+
+Lets Claude Code answer "how many tokens have I saved?" and call Token Ops tools directly. Register once:
+
+```sh
+claude mcp add token-ops token-ops-mcp
+```
+
+Verify with `claude mcp list`. Remove with `claude mcp remove token-ops`.
+
 ### 3. Restart your editor
 
 Claude Code, Cursor, and similar editors read hook / MCP configuration at startup. Quit (`Cmd+Q` on macOS) and reopen the project.
@@ -131,6 +141,10 @@ token-ops report
 `Runs: N` with N > 0 means it's firing.
 
 ![token-ops report sample output](assets/screenshots/report-sample.png)
+
+Or ask your AI in chat:
+
+> "How many tokens has Token Ops saved me so far?"
 
 ### Remove later
 
