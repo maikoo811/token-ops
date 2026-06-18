@@ -364,14 +364,18 @@ export function colorizeForTty(markdown, enabled = false) {
 }
 
 export function renderSavingsReport(report, lang = "en") {
+  const pct = report.selectedFullTokens > 0
+    ? Math.round((report.savedTokens / report.selectedFullTokens) * 100)
+    : 0;
+
   if (lang === "ja") {
     return [
       "# Token Ops 節約レポート",
       "",
       `- 実行回数: ${formatNumber(report.events)}`,
-      `- 推定削減: ~${formatNumber(report.savedTokens)} tokens`,
-      `- 生成パック合計: ~${formatNumber(report.packTokens)} tokens`,
-      `- 関連ファイル全文との差分: ~${formatNumber(report.savedTokens)} tokens`,
+      `- Token Ops未使用時(推定): ~${formatNumber(report.selectedFullTokens)} tokens`,
+      `- Token Ops使用時: ~${formatNumber(report.packTokens)} tokens`,
+      `- 節約見込み(最大): ~${formatNumber(report.savedTokens)} tokens (${pct}%)`,
       `- 記録ファイル: ${report.path}`
     ].join("\n");
   }
@@ -380,9 +384,9 @@ export function renderSavingsReport(report, lang = "en") {
     "# Token Ops Savings Report",
     "",
     `- Runs: ${formatNumber(report.events)}`,
-    `- Estimated saved: ~${formatNumber(report.savedTokens)} tokens`,
-    `- Generated packs: ~${formatNumber(report.packTokens)} tokens`,
-    `- Avoided vs selected full files: ~${formatNumber(report.savedTokens)} tokens`,
+    `- Without Token Ops (est.): ~${formatNumber(report.selectedFullTokens)} tokens`,
+    `- With Token Ops: ~${formatNumber(report.packTokens)} tokens`,
+    `- Saved (max): ~${formatNumber(report.savedTokens)} tokens (${pct}%)`,
     `- Log: ${report.path}`
   ].join("\n");
 }
