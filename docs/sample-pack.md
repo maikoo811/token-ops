@@ -14,8 +14,8 @@ Use the context below to work on this task. Prefer the referenced files and snip
 Task: Fix the Japanese keyword tokenizer in extractKeywords
 
 ## Repository
-- Root: /Users/maiko/Documents/dev/token-ops
-- Branch: chore/drop-whole-repo-framing
+- Root: /path/to/your-project
+- Branch: main
 - Estimated snippet tokens: ~2,960
 
 ## Git Status
