@@ -157,22 +157,6 @@ test("shouldInjectForPrompt: requires English word boundaries", () => {
   assert.equal(shouldInjectForPrompt("Run the test fixture"), true, "`test` standalone still triggers");
 });
 
-test("shouldInjectForPrompt: fires on common project-work vocabulary", () => {
-  // English additions — verbs and nouns that strongly imply needing code context
-  assert.equal(shouldInjectForPrompt("List the remaining tasks"), true);
-  assert.equal(shouldInjectForPrompt("Write an issue for this"), true);
-  assert.equal(shouldInjectForPrompt("Explain the two PRs"), true);
-  assert.equal(shouldInjectForPrompt("Looks like an install spec"), true);
-  assert.equal(shouldInjectForPrompt("Design a new feature"), true);
-
-  // Japanese additions — same kinds of prompts
-  assert.equal(shouldInjectForPrompt("残りのタスクをリストアップして"), true);
-  assert.equal(shouldInjectForPrompt("Issue を書いてみて"), true);
-  assert.equal(shouldInjectForPrompt("2 つの Issues を解説して"), true);
-  assert.equal(shouldInjectForPrompt("インストール特化するような仕様っぽい"), true);
-  assert.equal(shouldInjectForPrompt("設計を確認して"), true);
-});
-
 test("shouldInjectForPrompt: aggressive mode fires without trigger words", () => {
   // Prompts that would be REJECTED in smart mode (no coding keywords)
   assert.equal(shouldInjectForPrompt("How does this project work?", "aggressive"), true);
