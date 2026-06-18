@@ -281,3 +281,4 @@ Cursor-compatible local MCP template:
 - Pre-read guard policies for generated files, lockfiles, and logs
 - Code graph and impact analysis inspired by trace-mcp
 - Multi-agent savings reports across Cursor, Codex, and Claude Code
+- Real A/B-measured savings (current numbers are theoretical upper bounds)
