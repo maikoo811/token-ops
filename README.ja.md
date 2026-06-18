@@ -35,7 +35,7 @@ sequenceDiagram
 
 実例:
 
-![Token Ops CLI出力例: リファクタリングタスクで60%節約、リポジトリ全体に対して76%節約](assets/screenshots/measured-savings.png)
+![Token Ops CLI出力例: 同ランクのファイル全文と比較してリファクタリングタスクで60%節約](assets/screenshots/measured-savings.png)
 
 - このプロジェクト履歴全体のトークン数: **~288,000 → ~71,000**(4倍コンパクト)
 - 節約量: **~217,000トークン** ≈ **$0.65(Sonnet 4.5)** / **$3.25(Opus 4.7)**
@@ -281,3 +281,4 @@ Cursor互換のローカルMCPテンプレート:
 - 生成ファイル・ロックファイル・ログの事前読み取りガードポリシー
 - trace-mcpに着想を得たコードグラフと影響分析
 - Cursor・Codex・Claude Codeをまたぐマルチエージェント節約レポート
+- 実測ベースの節約値(現状の数値は理論上限)

@@ -364,15 +364,18 @@ export function colorizeForTty(markdown, enabled = false) {
 }
 
 export function renderSavingsReport(report, lang = "en") {
+  const pct = report.selectedFullTokens > 0
+    ? Math.round((report.savedTokens / report.selectedFullTokens) * 100)
+    : 0;
+
   if (lang === "ja") {
     return [
       "# Token Ops 節約レポート",
       "",
       `- 実行回数: ${formatNumber(report.events)}`,
-      `- 推定削減: ~${formatNumber(report.savedTokens)} tokens`,
-      `- 生成パック合計: ~${formatNumber(report.packTokens)} tokens`,
-      `- 関連ファイル全文との差分: ~${formatNumber(report.savedTokens)} tokens`,
-      `- リポジトリ全体読みとの差分: ~${formatNumber(report.repoSavedTokens)} tokens`,
+      `- Token Ops未使用時(推定): ~${formatNumber(report.selectedFullTokens)} tokens`,
+      `- Token Ops使用時: ~${formatNumber(report.packTokens)} tokens`,
+      `- 節約見込み(最大): ~${formatNumber(report.savedTokens)} tokens (${pct}%)`,
       `- 記録ファイル: ${report.path}`
     ].join("\n");
   }
@@ -381,10 +384,9 @@ export function renderSavingsReport(report, lang = "en") {
     "# Token Ops Savings Report",
     "",
     `- Runs: ${formatNumber(report.events)}`,
-    `- Estimated saved: ~${formatNumber(report.savedTokens)} tokens`,
-    `- Generated packs: ~${formatNumber(report.packTokens)} tokens`,
-    `- Avoided vs selected full files: ~${formatNumber(report.savedTokens)} tokens`,
-    `- Avoided vs whole repo: ~${formatNumber(report.repoSavedTokens)} tokens`,
+    `- Without Token Ops (est.): ~${formatNumber(report.selectedFullTokens)} tokens`,
+    `- With Token Ops: ~${formatNumber(report.packTokens)} tokens`,
+    `- Saved (max): ~${formatNumber(report.savedTokens)} tokens (${pct}%)`,
     `- Log: ${report.path}`
   ].join("\n");
 }
@@ -918,8 +920,6 @@ ${task}
 - ${text.generatedPack}: ~${formatNumber(budget.packTokens)} ${text.tokens}
 - ${text.selectedFullFiles}: ~${formatNumber(budget.selectedFullTokens)} ${text.tokens} (${budget.selectedFileCount} ${text.files})
 - ${text.estimatedSaved}: ~${formatNumber(budget.savedTokens)} ${text.tokens} (${budget.savedPercent}%)
-- ${text.wholeRepoBaseline}: ~${formatNumber(budget.repoTokens)} ${text.tokens} (${budget.repoFileCount} ${text.files})
-- ${text.repoAvoided}: ~${formatNumber(budget.repoSavedTokens)} ${text.tokens} (${budget.repoSavedPercent}%)
 
 ## ${text.suggestedPrompt}
 ${text.promptInstruction}
@@ -954,8 +954,6 @@ function labelsFor(lang) {
       generatedPack: "生成されたパック",
       selectedFullFiles: "関連ファイルを全文で読む場合",
       estimatedSaved: "推定削減",
-      wholeRepoBaseline: "リポジトリ全体を読む場合の概算",
-      repoAvoided: "全体読みとの差分",
       tokens: "tokens",
       tokensFullFile: "tokens / full file",
       files: "files",
@@ -982,8 +980,6 @@ function labelsFor(lang) {
     generatedPack: "Generated pack",
     selectedFullFiles: "Selected full files baseline",
     estimatedSaved: "Estimated saved",
-    wholeRepoBaseline: "Whole repository baseline",
-    repoAvoided: "Avoided vs whole repository",
     tokens: "tokens",
     tokensFullFile: "tokens full file",
     files: "files",

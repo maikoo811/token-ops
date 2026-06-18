@@ -35,7 +35,7 @@ Same answer quality, fewer tokens. The AI can still read more files if the pack 
 
 Example:
 
-![Token Ops CLI output: 60% saved on a refactor task, 76% against the whole repo](assets/screenshots/measured-savings.png)
+![Token Ops CLI output: 60% saved on a refactor task vs reading the same ranked files in full](assets/screenshots/measured-savings.png)
 
 - Total tokens across this project's history: **~288,000 → ~71,000** (4× smaller)
 - Saved: **~217,000 tokens** ≈ **$0.65 (Sonnet 4.5)** / **$3.25 (Opus 4.7)**
@@ -281,3 +281,4 @@ Cursor-compatible local MCP template:
 - Pre-read guard policies for generated files, lockfiles, and logs
 - Code graph and impact analysis inspired by trace-mcp
 - Multi-agent savings reports across Cursor, Codex, and Claude Code
+- Real A/B-measured savings (current numbers are theoretical upper bounds)
