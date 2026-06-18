@@ -412,8 +412,8 @@ export function shouldInjectForPrompt(prompt, mode = DEFAULT_TRIGGER_MODE) {
     return true;
   }
   // \b for English (so `fix` doesn't match `prefix`); CJK doesn't use \b reliably.
-  const englishHit = /\b(?:fix|bug|add|implement|refactor|test|review|debug|change|update)\b/i.test(prompt);
-  const japaneseHit = /コード|実装|修正|追加|テスト|レビュー|改善|エラー|バグ|直|不具合|動かな|壊/.test(prompt);
+  const englishHit = /\b(?:fix|bug|add|implement|refactor|test|review|debug|change|update|issues?|PRs?|docs?|specs?|features?|documents?|configures?|installs?|setups?|explains?|designs?|writes?|checks?|lists?|builds?|deploys?)\b/i.test(prompt);
+  const japaneseHit = /コード|実装|修正|追加|テスト|レビュー|改善|エラー|バグ|直|不具合|動かな|壊|タスク|Issue|PR|プルリク|リスト|解説|仕様|機能|設計|確認|調べ|ドキュメント|インストール|セットアップ|書い|教え|作っ|作る|デプロイ/.test(prompt);
   return englishHit || japaneseHit;
 }
 
