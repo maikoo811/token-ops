@@ -4,11 +4,9 @@
 Fix the Japanese keyword tokenizer in extractKeywords
 
 ## Token Budget
-- Generated pack: ~5,360 tokens
-- Selected full files baseline: ~14,622 tokens (6 files)
-- Estimated saved: ~9,262 tokens (63%)
-- Whole repository baseline: ~22,822 tokens (20 files)
-- Avoided vs whole repository: ~17,462 tokens (77%)
+- Generated pack: ~3,297 tokens
+- Selected full files baseline: ~27,916 tokens (6 files)
+- Estimated saved: ~24,619 tokens (88%)
 
 ## Suggested Prompt
 Use the context below to work on this task. Prefer the referenced files and snippets before reading broader repository context. If the snippets are insufficient, ask for or inspect only the smallest additional files needed.
@@ -17,83 +15,80 @@ Task: Fix the Japanese keyword tokenizer in extractKeywords
 
 ## Repository
 - Root: /Users/maiko/Documents/dev/token-ops
-- Branch: chore/marketplace-manifest
-- Estimated snippet tokens: ~5,000
+- Branch: chore/drop-whole-repo-framing
+- Estimated snippet tokens: ~2,960
 
 ## Git Status
--  M CHANGELOG.md
--  M mcp/server.js
--  M package.json
-- D  plugin.json
-- ?? .cursor-plugin/
+-  M README.ja.md
+-  M README.md
+-  M docs/sample-pack.md
+-  M src/core.js
 
 ## Keywords
 `japanese`, `keyword`, `tokenizer`, `in`, `extractkeywords`
 
 ## Relevant Files
-- CHANGELOG.md (~1,026 tokens full file)
-- .cursor-plugin/plugin.json (~252 tokens full file)
-- docs/sample-pack.md (~5,018 tokens full file)
-- README.md (~1,420 tokens full file)
-- src/core.js (~4,712 tokens full file)
-- test/cli.test.js (~2,194 tokens full file)
+- src/core.js (~7,692 tokens full file)
+- .cursor-plugin/plugin.json (~260 tokens full file)
+- bin/token-ops.js (~3,064 tokens full file)
+- test/cli.test.js (~8,476 tokens full file)
+- test/core.test.js (~4,515 tokens full file)
+- src/integrations.js (~3,909 tokens full file)
 
 ## Snippets
-### CHANGELOG.md
+### src/core.js
 
-```md
-   1 | # Changelog
-   2 | 
-   3 | All notable changes to Token Ops are documented in this file.
+```js
+   1 | import { execFileSync } from "node:child_process";
+   2 | import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+   3 | import { basename, extname, join, relative, sep } from "node:path";
    4 | 
-   5 | The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-   6 | and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-   7 | 
-   8 | ## [0.3.1] — 2026-05-25
-   9 | 
-  10 | ### Changed
-  11 | - Refactored the plugin manifest to match the official Cursor Marketplace schema (`https://cursor.com/schemas/cursor-plugin/plugin.json`):
-  12 |   - Moved manifest from root `plugin.json` to `.cursor-plugin/plugin.json` (required location).
-  13 |   - Replaced the `components: { ... }` wrapper with top-level `skills` / `rules` / `commands` / `mcpServers` keys.
-  14 |   - Switched `categories: [array]` → `category: "developer-tools"` (singular).
-  15 |   - Converted `repository` from an object to a URL string.
-  16 |   - Added `author: { name, email }` and SPDX `license`.
-  17 |   - Removed `bugs` and `privacy` keys (not in the schema; `additionalProperties: false` would reject the manifest at validation).
-  18 | - The CLI, MCP server, and Claude Code integrations are unaffected — this is purely a marketplace packaging change.
-  19 | 
-  20 | ## [0.3.0] — 2026-05-25
-  21 | 
-  22 | ### Added
-  23 | - `token-ops uninstall [target]` command — mirrors `install`, removes only what install created and preserves unrelated `.claude/settings.local.json` hooks/permissions and `AGENTS.md` content.
-  24 | - LICENSE file (MIT) so GitHub auto-detects the license and Cursor Marketplace requirements are met.
-  25 | - GitHub Actions CI workflow running `npm test` on Node 18 / 20 / 22 for every push and PR to `main`.
-  26 | - Unit-test suite for the pure helpers (`extractKeywords`, `estimateTokens`, `finalizeTokenBudget`, `shouldInjectForPrompt`, `resolveLanguage`) — 15 tests in `test/core.test.js`.
-  27 | - `docs/sample-pack.md` checked in as a verbatim sample of pack output.
-  28 | - "Measured Savings" section in README with a Mermaid bar chart, a real-task table, a "what 'saved' actually measures" explainer, and verification steps.
-  29 | 
-  30 | ### Changed
-  31 | - **`estimateTokens` is now script-aware**: ASCII counted at `length / 4`, CJK (Han / Hiragana / Katakana) counted at `length / 1.5`. Token estimates for Japanese-heavy content now better reflect BPE tokenizer behavior. Numerical savings reports will shift accordingly.
-  32 | - **`extractKeywords` splits Japanese into per-word tokens** (Han runs and Katakana runs of 2+ chars), instead of treating contiguous CJK as a single keyword. Fixes the case where a whole Japanese sentence was used as one keyword.
-  33 | - **`shouldInjectForPrompt` adds JA bug-report triggers** (`バグ`, `直`, `不具合`, `動かな`, `壊`) and lowers the minimum prompt length from 12 to 6 chars so short Japanese requests like `バグを直して` fire the Claude Code hook.
-  34 | - **`shouldInjectForPrompt` uses `\b` word boundaries for English triggers** so `fix` no longer matches `prefix` / `fixture` and `add` no longer matches `address`. Japanese substring matching is preserved (`\b` is unreliable around CJK).
-  35 | - **`rankFiles` bridges ~30 Japanese tech terms to their English equivalents** during file ranking, so Japanese prompts can match English-named files (e.g. `キーワード` → `keyword`, `バグ` → `bug`).
-  36 | - Default GitHub branch changed from a feature branch to `main`.
-  37 | - Repository description set on GitHub.
-  38 | 
-  39 | ### Fixed
-  40 | - Cleaned up stale feature branch (`codex/cursor-plugin-mvp`) on origin.
-  41 | - `.gitignore` now excludes `.claude/` since installed hook configs contain absolute paths that would break for other contributors.
-  42 | 
-  43 | ## [0.2.0] — 2026-05-24
-  44 | 
-  45 | ### Added
-  46 | - Initial Cursor Marketplace plugin packaging (`plugin.json`, beginner defaults of 6 files / 80 snippet lines).
-  47 | - One-command editor setup: `token-ops install [target]` writes Claude Code skill, Claude Code `UserPromptSubmit` hook, Cursor rule, and `AGENTS.md` block.
-  48 | - MCP server (`mcp/server.js`) exposing `build_compact_context`, `estimate_context_cost`, `list_high_cost_files`, `report_saved_tokens`.
-  49 | - CLI commands: `pack`, `report`, `cost`, `high-cost-files`, `install`, `hook`.
-  50 | - `MARKETPLACE.md` and `SECURITY.md` documentation for distribution and privacy posture.
-  51 | - Bilingual output (auto / en / ja) for packs and the savings report.
-  52 | 
+   5 | export const DEFAULT_MAX_FILES = 8;
+   6 | export const DEFAULT_MAX_LINES = 120;
+   7 | export const DEFAULT_CONTEXT = 8;
+   8 | export const MAX_FILE_BYTES = 220_000;
+   9 | export const DEFAULT_LANG = "auto";
+  10 | 
+  11 | export const MAX_TRACKED_FILES = 50_000;
+  12 | export const GIT_TIMEOUT_MS = 10_000;
+  13 | 
+  14 | export const SESSION_LOG_MAX_BYTES = 2 * 1024 * 1024;
+  15 | export const SESSION_LOG_KEEP_LINES = 10_000;
+  16 | 
+  17 | const STOP_WORDS = new Set([
+  18 |   "the",
+  19 |   "and",
+  20 |   "for",
+  21 |   "with",
+  22 |   "from",
+  23 |   "this",
+  39 |   "の",
+  40 |   "を",
+  41 |   "に",
+  42 |   "へ",
+  43 |   "で"
+  44 | ]);
+  45 | 
+  46 | const JA_TO_EN = new Map([
+  47 |   ["キーワード", ["keyword"]],
+  48 |   ["抽出", ["extract", "extractor"]],
+  49 |   ["バグ", ["bug"]],
+  50 |   ["関数", ["function", "func"]],
+  51 |   ["テスト", ["test", "spec"]],
+  52 |   ["クラス", ["class"]],
+  53 |   ["型", ["type"]],
+  54 |   ["設定", ["config", "setting", "option"]],
+  55 |   ["認証", ["auth"]],
+  56 |   ["接続", ["connection", "connect"]],
+  57 |   ["削除", ["delete", "remove"]],
+  58 |   ["追加", ["add", "insert"]],
+  59 |   ["取得", ["get", "fetch"]],
+  60 |   ["保存", ["save", "persist"]],
+  61 |   ["読込", ["load", "read"]],
+  62 |   ["書込", ["write"]],
+  63 |   ["一覧", ["list"]],
+  64 |   ["詳細", ["detail"]],
+  65 |   ["概要", ["summary", "overview"]],
 ```
 
 ### .cursor-plugin/plugin.json
@@ -104,7 +99,7 @@ Task: Fix the Japanese keyword tokenizer in extractKeywords
    3 |   "name": "token-ops",
    4 |   "displayName": "Token Ops: AI Token Saver",
    5 |   "description": "Stop Cursor and Claude Code from wasting tokens on broad repo reads. Runs locally with no API key, account, or cloud backend.",
-   6 |   "version": "0.3.1",
+   6 |   "version": "0.6.2",
    7 |   "author": {
    8 |     "name": "Maiko Kojima",
    9 |     "email": "694169+maikoo811@users.noreply.github.com"
@@ -113,371 +108,252 @@ Task: Fix the Japanese keyword tokenizer in extractKeywords
   12 |   "homepage": "https://github.com/maikoo811/token-ops",
   13 |   "repository": "https://github.com/maikoo811/token-ops",
   14 |   "license": "MIT",
-  15 |   "category": "developer-tools",
-  16 |   "keywords": [
-  17 |     "tokens",
-  18 |     "context",
-  19 |     "cursor",
-  20 |     "claude-code",
-  21 |     "mcp",
-  22 |     "vibe-coding"
-  23 |   ],
-  24 |   "tags": [
-  25 |     "tokens",
-  26 |     "context",
-  27 |     "mcp",
-  28 |     "productivity",
-  29 |     "agents"
-  30 |   ],
-  31 |   "rules": "./rules/",
-  32 |   "skills": "./skills/",
-  33 |   "commands": "./commands/",
-  34 |   "mcpServers": {
-  35 |     "token-ops": {
-  36 |       "command": "node",
-  37 |       "args": ["${PLUGIN_ROOT}/mcp/server.js"]
-  38 |     }
-  39 |   }
-  40 | }
-  41 | 
+  15 |   "logo": "assets/avatar.png",
+  16 |   "category": "developer-tools",
+  17 |   "keywords": [
+  18 |     "tokens",
+  19 |     "context",
+  20 |     "cursor",
+  21 |     "claude-code",
+  22 |     "mcp",
+  23 |     "vibe-coding"
+  24 |   ],
+  25 |   "tags": [
+  26 |     "tokens",
+  27 |     "context",
+  28 |     "mcp",
+  29 |     "productivity",
+  30 |     "agents"
+  31 |   ],
+  32 |   "rules": "./rules/",
+  33 |   "skills": "./skills/",
+  34 |   "commands": "./commands/",
+  35 |   "mcpServers": {
+  36 |     "token-ops": {
+  37 |       "command": "node",
+  38 |       "args": ["${PLUGIN_ROOT}/mcp/server.js"]
+  39 |     }
+  40 |   }
+  41 | }
+  42 | 
 ```
 
-### docs/sample-pack.md
-
-```md
-   1 | # Token Ops Context Pack
-   2 | 
-   3 | ## Task
-   4 | Fix the Japanese keyword tokenizer in extractKeywords
-   5 | 
-   6 | ## Token Budget
-   7 | - Generated pack: ~5,015 tokens
-   8 | - Selected full files baseline: ~14,174 tokens (6 files)
-   9 | - Estimated saved: ~9,159 tokens (65%)
-  10 | - Whole repository baseline: ~20,823 tokens (19 files)
-  11 | - Avoided vs whole repository: ~15,808 tokens (76%)
-  12 | 
-  13 | ## Suggested Prompt
-  14 | Use the context below to work on this task. Prefer the referenced files and snippets before reading broader repository context. If the snippets are insufficient, ask for or inspect only the smallest additional files needed.
-  15 | 
-  16 | Task: Fix the Japanese keyword tokenizer in extractKeywords
-  17 | 
-  18 | ## Repository
-  19 | - Root: /Users/maiko/Documents/dev/token-ops
-  20 | - Branch: feat/token-estimate-precision
-  21 | - Estimated snippet tokens: ~4,669
-  22 | 
-  23 | ## Git Status
-  24 | -  M README.md
-  25 | -  M src/core.js
-  26 | -  M test/core.test.js
-  27 | 
-  28 | ## Keywords
-  29 | `japanese`, `keyword`, `tokenizer`, `in`, `extractkeywords`
-  30 | 
-  31 | ## Relevant Files
-  32 | - README.md (~1,420 tokens full file)
-  33 | - src/core.js (~4,712 tokens full file)
-  34 | - test/core.test.js (~1,551 tokens full file)
-  35 | - plugin.json (~294 tokens full file)
-  36 | - docs/sample-pack.md (~4,003 tokens full file)
-  37 | - test/cli.test.js (~2,194 tokens full file)
-  38 | 
-  39 | ## Snippets
-  40 | ### README.md
-  41 | 
-  42 | ```md
-  43 |    1 | # Token Ops
-  44 |    2 | 
-  45 |    3 | Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Claude Code, Codex, and other MCP-compatible agents a compact task-focused context pack before they read broadly, then records an estimated saved-token report.
-  46 |    4 | 
-  47 |    5 | The product goal is simple: install once, vibe code normally, and see how much context the agent avoided.
-  48 |    6 | 
-  49 |    7 | ## Measured Savings
-  50 |    8 | 
-  51 |    9 | Real numbers from running `token-ops pack` against this repository (19 tracked files, ~20,780 tokens of full-repo context, script-aware estimator):
-  52 |   10 | 
-  53 |   11 | ```mermaid
-  54 |   12 | ---
-  55 |   13 | config:
-  56 |   14 |   xyChart:
-  57 |   15 |     width: 760
-  58 |   16 |     height: 320
-  59 |   17 |   themeVariables:
-  60 |   18 |     xyChart:
-  61 |   19 |       plotColorPalette: "#16a34a"
-  62 |   20 | ---
-  63 |   21 | xychart-beta
-  64 |   22 |   title "Tokens saved per pack (vs whole-repo baseline, higher is better)"
-  65 |   23 |   x-axis ["Fix JA tokenizer", "Add uninstall", "Build pack"]
-  66 |   24 |   y-axis "Tokens saved" 0 --> 20000
-  67 |   25 |   bar [15811, 17607, 16127]
-  68 |   26 | ```
-  69 |   27 | 
-  70 |   28 | | Task | Pack size | Vs selected full files | Vs whole repo |
-  71 |   29 | |---|---|---|---|
-  72 |   30 | | `Fix the Japanese keyword tokenizer in extractKeywords` | ~4,969 tokens | 65% smaller | 76% smaller |
-  73 |   31 | | `Add an uninstall command to the CLI` | ~3,173 tokens | 63% smaller | 85% smaller |
-  74 |   32 | | `Build a compact context pack for the current task` | ~4,653 tokens | 68% smaller | 78% smaller |
-  75 |   33 | 
-  76 |   34 | A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pack.md) so you can see exactly what Token Ops produces.
-  77 |   35 | 
-  78 |   36 | ### What "saved" actually measures
-  79 |   37 | 
-  80 |   38 | - **Pack size** is a rough token estimate: `length / 4` for ASCII and `length / 1.5` for CJK characters, summed. BPE tokenizers split CJK more aggressively than ASCII, so a single ratio underestimates Japanese-heavy content.
-```
-
-### README.md
-
-```md
-   1 | # Token Ops
-   2 | 
-   3 | Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Claude Code, Codex, and other MCP-compatible agents a compact task-focused context pack before they read broadly, then records an estimated saved-token report.
-   4 | 
-   5 | The product goal is simple: install once, vibe code normally, and see how much context the agent avoided.
-   6 | 
-   7 | ## Measured Savings
-   8 | 
-   9 | Real numbers from running `token-ops pack` against this repository (19 tracked files, ~20,780 tokens of full-repo context, script-aware estimator):
-  10 | 
-  11 | ```mermaid
-  12 | ---
-  13 | config:
-  14 |   xyChart:
-  15 |     width: 760
-  16 |     height: 320
-  17 |   themeVariables:
-  18 |     xyChart:
-  19 |       plotColorPalette: "#16a34a"
-  20 | ---
-  21 | xychart-beta
-  22 |   title "Tokens saved per pack (vs whole-repo baseline, higher is better)"
-  23 |   x-axis ["Fix JA tokenizer", "Add uninstall", "Build pack"]
-  24 |   y-axis "Tokens saved" 0 --> 20000
-  25 |   bar [15811, 17607, 16127]
-  26 | ```
-  27 | 
-  28 | | Task | Pack size | Vs selected full files | Vs whole repo |
-  29 | |---|---|---|---|
-  30 | | `Fix the Japanese keyword tokenizer in extractKeywords` | ~4,969 tokens | 65% smaller | 76% smaller |
-  31 | | `Add an uninstall command to the CLI` | ~3,173 tokens | 63% smaller | 85% smaller |
-  32 | | `Build a compact context pack for the current task` | ~4,653 tokens | 68% smaller | 78% smaller |
-  33 | 
-  34 | A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pack.md) so you can see exactly what Token Ops produces.
-  35 | 
-  36 | ### What "saved" actually measures
-  37 | 
-  38 | - **Pack size** is a rough token estimate: `length / 4` for ASCII and `length / 1.5` for CJK characters, summed. BPE tokenizers split CJK more aggressively than ASCII, so a single ratio underestimates Japanese-heavy content.
-  39 | - **Vs selected full files** compares the pack against reading the same ranked files in full.
-  40 | - **Vs whole repo** compares against reading every tracked text file. This is an upper bound — a real agent wouldn't read everything, so treat this number as a ceiling, not a typical baseline.
-  41 | 
-  42 | What this does NOT measure: whether the pack contained the right context, or how many follow-up reads the agent makes. Token Ops earns its keep when its snippets are sufficient for the task; it does not stop the agent from reading more when needed.
-  43 | 
-  44 | ### Verify these numbers yourself
-  45 | 
-  46 | Inside this repository:
-  47 | 
-  48 | ```sh
-  49 | npm install
-  50 | npm test
-  51 | node bin/token-ops.js pack "Fix the Japanese keyword tokenizer in extractKeywords"
-  52 | ```
-  53 | 
-  54 | The `## Token Budget` section of the output is the source of the table above.
-  55 | 
-  56 | ## Beginner Defaults
-  57 | 
-  58 | Token Ops is designed to be useful without setup:
-  59 | 
-  60 | - No API key
-  61 | - No account
-  62 | - No cloud backend
-  63 | - No telemetry by default
-  64 | - Local MCP server
-  65 | - Beginner defaults: 6 files, 80 snippet lines per file, auto language
-  66 | 
-  67 | ## Cursor Plugin
-  68 | 
-  69 | Token Ops is being shaped for Cursor Marketplace distribution as a free local plugin.
-  70 | 
-  71 | The plugin includes:
-  72 | 
-  73 | - A local MCP server: `mcp/server.js`
-  74 | - Cursor rules: `rules/token-ops.mdc`
-  75 | - A Token Ops skill: `skills/token-ops/SKILL.md`
-  76 | - Commands for compact context and saved-token reports
-  77 | 
-  78 | The MCP server runs locally. It does not require a hosted backend or a Token Ops account.
-  79 | 
-  80 | After installation, users can ask Cursor:
-```
-
-### src/core.js
+### bin/token-ops.js
 
 ```js
-   1 | import { execFileSync } from "node:child_process";
-   2 | import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-   3 | import { basename, extname, join, relative } from "node:path";
-   4 | 
-   5 | export const DEFAULT_MAX_FILES = 8;
-   6 | export const DEFAULT_MAX_LINES = 120;
-   7 | export const DEFAULT_CONTEXT = 8;
-   8 | export const MAX_FILE_BYTES = 220_000;
-   9 | export const DEFAULT_LANG = "auto";
-  10 | 
-  11 | const STOP_WORDS = new Set([
-  12 |   "the",
-  13 |   "and",
-  14 |   "for",
-  33 |   "の",
-  34 |   "を",
-  35 |   "に",
-  36 |   "へ",
-  37 |   "で"
-  38 | ]);
-  39 | 
-  40 | const JA_TO_EN = new Map([
-  41 |   ["キーワード", ["keyword"]],
-  42 |   ["抽出", ["extract", "extractor"]],
-  43 |   ["バグ", ["bug"]],
-  44 |   ["関数", ["function", "func"]],
-  45 |   ["テスト", ["test", "spec"]],
-  46 |   ["クラス", ["class"]],
-  47 |   ["型", ["type"]],
-  48 |   ["設定", ["config", "setting", "option"]],
-  49 |   ["認証", ["auth"]],
-  50 |   ["接続", ["connection", "connect"]],
-  51 |   ["削除", ["delete", "remove"]],
-  52 |   ["追加", ["add", "insert"]],
-  53 |   ["取得", ["get", "fetch"]],
-  54 |   ["保存", ["save", "persist"]],
-  55 |   ["読込", ["load", "read"]],
-  56 |   ["書込", ["write"]],
-  57 |   ["一覧", ["list"]],
-  58 |   ["詳細", ["detail"]],
-  59 |   ["概要", ["summary", "overview"]],
-  60 |   ["エラー", ["error", "err"]],
-  61 |   ["例外", ["exception", "exc"]],
-  62 |   ["検索", ["search", "find", "query"]],
-  63 |   ["並び替え", ["sort"]],
-  64 |   ["集計", ["aggregate", "count"]],
-  65 |   ["通知", ["notify", "notification"]],
-  66 |   ["ログ", ["log", "logger"]],
-  67 |   ["起動", ["start", "boot", "init"]],
-  68 |   ["終了", ["stop", "exit", "shutdown"]],
-  69 |   ["再起動", ["restart", "reboot"]],
-  70 |   ["監視", ["watch", "monitor", "observe"]],
-  71 |   ["同期", ["sync"]],
-  72 |   ["非同期", ["async"]],
-  73 |   ["並列", ["parallel", "concurrent"]]
-  74 | ]);
-  75 | 
- 111 |   ".ts",
- 112 |   ".tsx",
- 113 |   ".txt",
- 114 |   ".vue",
- 115 |   ".yaml",
- 116 |   ".yml"
- 117 | ]);
- 118 | 
- 119 | export function generatePack({ task, cwd, maxFiles = DEFAULT_MAX_FILES, maxLines = DEFAULT_MAX_LINES, lang = "en" }) {
- 120 |   const files = listTrackedFiles(cwd);
- 121 |   const git = readGitState(cwd);
- 122 |   const keywords = extractKeywords(task);
- 123 |   const rankedFiles = rankFiles(files, keywords, git.changedFiles, cwd);
- 124 |   const consideredFiles = rankedFiles.slice(0, maxFiles);
- 125 |   const candidates = consideredFiles.map((file) => buildSnippet(file, keywords, cwd, maxLines));
- 126 |   const budget = buildTokenBudget({ candidates, files, consideredFiles, cwd });
- 127 |   const provisional = renderPack({ task, cwd, git, keywords, candidates, budget, lang });
- 128 |   const finalBudget = finalizeTokenBudget(budget, estimateTokens(provisional));
- 129 |   const markdown = renderPack({ task, cwd, git, keywords, candidates, budget: finalBudget, lang });
- 130 | 
- 131 |   return {
- 132 |     markdown,
- 133 |     budget: finalBudget,
+   1 | #!/usr/bin/env node
+   2 | 
+   3 | // Manual version guard: the ESM imports below are hoisted, so a `package.json`
+   4 | // `engines` failure would surface as an opaque syntax error on Node 16/17
+   5 | // before this file's logic runs. Emit a readable message instead.
+   6 | const NODE_MAJOR = Number.parseInt(process.versions.node.split(".")[0], 10);
+   7 | if (NODE_MAJOR < 18) {
+   8 |   process.stderr.write(
+   9 |     `token-ops requires Node.js 18 or later. You are running ${process.version}.\n` +
+  10 |       "Please upgrade: https://nodejs.org\n"
+  11 |   );
+  12 |   process.exit(1);
+  13 | }
+  14 | 
+  15 | import { readFileSync, writeFileSync } from "node:fs";
+  16 | import { join } from "node:path";
+  17 | import {
+  18 |   DEFAULT_LANG,
+  19 |   DEFAULT_MAX_FILES,
+  20 |   DEFAULT_MAX_LINES,
+  21 |   DEFAULT_TRIGGER_MODE,
+  22 |   colorizeForTty,
+  23 |   estimateContextCost,
+  24 |   generatePack,
+  25 |   listHighCostFiles,
+  26 |   simplifyForTerminal,
+  27 |   readLanguage,
+  28 |   readSavingsReport,
+  29 |   readTriggerMode,
+  30 |   recordSessionEvent,
+  31 |   renderSavingsReport,
+  32 |   resolveLanguage,
+  33 |   shouldInjectForPrompt,
+  34 |   toPositiveInt,
+  35 |   validateCwd
+  36 | } from "../src/core.js";
+  37 | import {
+  38 |   findTrackedManagedFiles,
+  39 |   installIntegration,
+  40 |   isNvmManagedNode,
+  41 |   renderCursorRule,
+  42 |   uninstallIntegration
+  43 | } from "../src/integrations.js";
+  44 | 
+  45 | const args = process.argv.slice(2);
+  46 | const command = args.shift();
+  47 | 
+  48 | try {
+  49 |   if (!command || command === "-h" || command === "--help") {
+  50 |     printHelp();
 ```
 
 ### test/cli.test.js
 
 ```js
    1 | import { execFileSync } from "node:child_process";
-   2 | import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+   2 | import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
    3 | import { tmpdir } from "node:os";
    4 | import { join, resolve } from "node:path";
    5 | import test from "node:test";
    6 | import assert from "node:assert/strict";
    7 | import { shouldInjectForPrompt } from "../src/core.js";
-   8 | 
-   9 | const cli = resolve("bin/token-ops.js");
-  10 | 
-  11 | test("prints help", () => {
-  12 |   const output = execFileSync(process.execPath, [cli, "--help"], { encoding: "utf8" });
-  13 |   assert.match(output, /token-ops/);
-  14 |   assert.match(output, /pack/);
-  15 | });
-  16 | 
-  17 | test("builds a compact context pack from a git repository", () => {
-  18 |   const cwd = mkdtempSync(join(tmpdir(), "token-ops-"));
-  19 |   execFileSync("git", ["init"], { cwd, stdio: "ignore" });
-  20 |   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
-  21 |   execFileSync("git", ["config", "user.name", "Token Ops Test"], { cwd });
+   8 | import { isNvmManagedNode } from "../src/integrations.js";
+   9 | 
+  10 | const cli = resolve("bin/token-ops.js");
+  11 | 
+  12 | test("prints help", () => {
+  13 |   const output = execFileSync(process.execPath, [cli, "--help"], { encoding: "utf8" });
+  14 |   assert.match(output, /token-ops/);
+  15 |   assert.match(output, /pack/);
+  16 | });
+  17 | 
+  18 | test("builds a compact context pack from a git repository", () => {
+  19 |   const cwd = mkdtempSync(join(tmpdir(), "token-ops-"));
+  20 |   execFileSync("git", ["init"], { cwd, stdio: "ignore" });
+  21 |   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
+  22 |   execFileSync("git", ["config", "user.name", "Token Ops Test"], { cwd });
+  23 | 
+  24 |   writeFileSync(join(cwd, "importer.js"), "export function importCsv(row) {\n  return row.csv_id;\n}\n");
+  25 |   writeFileSync(join(cwd, "README.md"), "# Demo\n");
+  26 |   execFileSync("git", ["add", "."], { cwd });
+  27 |   execFileSync("git", ["commit", "-m", "initial"], { cwd, stdio: "ignore" });
+  28 | 
+  29 |   const output = execFileSync(process.execPath, [cli, "pack", "fix csv importer"], {
+  30 |     cwd,
+  31 |     encoding: "utf8"
+  32 |   });
+  33 | 
+  34 |   assert.match(output, /# Token Ops Context Pack/);
+  35 |   assert.match(output, /importer\.js/);
+  36 |   assert.match(output, /csv_id/);
+  37 | 
+  38 |   const report = execFileSync(process.execPath, [cli, "report"], {
+  39 |     cwd,
+  40 |     encoding: "utf8"
+  41 |   });
+  42 |   assert.match(report, /Token Ops Savings Report/);
+  43 |   assert.match(report, /Runs: 1/);
+  44 | });
+  45 | 
+  46 | test("installs Cursor and Claude Code project helpers", () => {
+  47 |   const cwd = mkdtempSync(join(tmpdir(), "token-ops-install-"));
+  48 |   const output = execFileSync(process.execPath, [cli, "install"], {
+  49 |     cwd,
+  50 |     encoding: "utf8"
+```
+
+### test/core.test.js
+
+```js
+   1 | import { execFileSync } from "node:child_process";
+   2 | import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+   3 | import { tmpdir, platform } from "node:os";
+   4 | import { join } from "node:path";
+   5 | import test from "node:test";
+   6 | import assert from "node:assert/strict";
+   7 | import {
+   8 |   colorizeForTty,
+   9 |   extractKeywords,
+  10 |   estimateTokens,
+  11 |   finalizeTokenBudget,
+  12 |   simplifyForTerminal,
+  13 |   readSavingsReport,
+  14 |   recordSessionEvent,
+  15 |   SESSION_LOG_KEEP_LINES,
+  16 |   SESSION_LOG_MAX_BYTES,
+  17 |   shouldInjectForPrompt,
+  18 |   resolveLanguage
+  19 | } from "../src/core.js";
+  20 | 
+  21 | // ---- extractKeywords ----
   22 | 
-  23 |   writeFileSync(join(cwd, "importer.js"), "export function importCsv(row) {\n  return row.csv_id;\n}\n");
-  24 |   writeFileSync(join(cwd, "README.md"), "# Demo\n");
-  25 |   execFileSync("git", ["add", "."], { cwd });
-  26 |   execFileSync("git", ["commit", "-m", "initial"], { cwd, stdio: "ignore" });
+  23 | test("extractKeywords: ASCII tokens are lowercased and stop words dropped", () => {
+  24 |   const out = extractKeywords("Fix the CSV import bug");
+  25 |   assert.deepEqual(out, ["csv", "import", "bug"]);
+  26 | });
   27 | 
-  28 |   const output = execFileSync(process.execPath, [cli, "pack", "fix csv importer"], {
-  29 |     cwd,
-  30 |     encoding: "utf8"
-  31 |   });
-  32 | 
-  33 |   assert.match(output, /# Token Ops Context Pack/);
-  34 |   assert.match(output, /importer\.js/);
-  35 |   assert.match(output, /csv_id/);
-  36 | 
-  37 |   const report = execFileSync(process.execPath, [cli, "report"], {
-  38 |     cwd,
-  39 |     encoding: "utf8"
-  40 |   });
-  41 |   assert.match(report, /Token Ops Savings Report/);
-  42 |   assert.match(report, /Runs: 1/);
-  43 | });
-  44 | 
-  45 | test("installs Cursor and Claude Code project helpers", () => {
-  46 |   const cwd = mkdtempSync(join(tmpdir(), "token-ops-install-"));
-  47 |   const output = execFileSync(process.execPath, [cli, "install"], {
-  48 |     cwd,
-  49 |     encoding: "utf8"
-  50 |   });
-  51 | 
-  52 |   assert.match(output, /Installed token-ops integration/);
-  53 |   assert.equal(existsSync(join(cwd, ".claude", "skills", "token-ops", "SKILL.md")), true);
-  54 |   assert.equal(existsSync(join(cwd, ".claude", "settings.local.json")), true);
-  55 |   assert.equal(existsSync(join(cwd, ".cursor", "rules", "token-ops.mdc")), true);
-  56 |   assert.equal(existsSync(join(cwd, "AGENTS.md")), true);
-  57 | });
-  58 | 
-  59 | test("claude prompt hook emits additional compact context", () => {
-  60 |   const cwd = mkdtempSync(join(tmpdir(), "token-ops-hook-"));
-  61 |   execFileSync("git", ["init"], { cwd, stdio: "ignore" });
-  62 |   writeFileSync(join(cwd, "README.md"), "# Demo\n\nCursor setup notes.\n");
-  63 | 
-  64 |   const output = execFileSync(process.execPath, [cli, "hook", "claude-user-prompt-submit"], {
-  65 |     cwd,
-  66 |     encoding: "utf8",
-  67 |     input: JSON.stringify({
-  68 |       cwd,
-  69 |       prompt: "READMEのCursor説明を改善して"
-  70 |     })
-  71 |   });
-  72 | 
-  73 |   const parsed = JSON.parse(output);
-  74 |   assert.equal(parsed.hookSpecificOutput.hookEventName, "UserPromptSubmit");
-  75 |   assert.match(parsed.hookSpecificOutput.additionalContext, /Token Ops コンテキストパック/);
-  76 |   assert.match(parsed.hookSpecificOutput.additionalContext, /トークン予算/);
-  77 |   assert.match(parsed.hookSpecificOutput.additionalContext, /README\.md/);
-  78 | });
-  79 | 
-  80 | test("splits Japanese prompts into per-word keywords, not one long blob", () => {
+  28 | test("extractKeywords: Japanese is split into per-word Han/Katakana tokens", () => {
+  29 |   const out = extractKeywords("キーワード抽出のバグを直して");
+  30 |   assert.ok(out.includes("キーワード"));
+  31 |   assert.ok(out.includes("抽出"));
+  32 |   assert.ok(out.includes("バグ"));
+  33 |   assert.ok(!out.includes("キーワード抽出のバグを直して"));
+  34 | });
+  35 | 
+  36 | test("extractKeywords: hiragana-only tokens are dropped (grammar particles)", () => {
+  37 |   const out = extractKeywords("ファイルをひらいて");
+  38 |   assert.ok(out.includes("ファイル"));
+  39 |   assert.ok(!out.includes("ひらいて"));
+  40 | });
+  41 | 
+  42 | test("extractKeywords: drops Japanese stop words 修正/追加/実装/変更", () => {
+  43 |   // Note: contiguous Han runs become a single token (no morphological split),
+  44 |   // so "認証機能" is one keyword, not 認証 + 機能.
+  45 |   const out = extractKeywords("バグを修正したい");
+  46 |   assert.ok(out.includes("バグ"));
+  47 |   assert.ok(!out.includes("修正"), "stop word 修正 should be dropped");
+  48 | });
+  49 | 
+  50 | test("extractKeywords: returns at most 20 unique keywords", () => {
+```
+
+### src/integrations.js
+
+```js
+   1 | import { execFileSync } from "node:child_process";
+   2 | import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
+   3 | import { homedir } from "node:os";
+   4 | import { dirname, join } from "node:path";
+   5 | 
+   6 | // Each entry embeds an absolute path or user-specific data; committing any
+   7 | // of them leaks the maintainer's environment and breaks teammates' configs.
+   8 | const GITIGNORE_HEADER = "# Token Ops local files";
+   9 | const GITIGNORE_ENTRIES = [
+  10 |   ".token-ops/",
+  11 |   ".claude/settings.local.json",
+  12 |   ".claude/skills/token-ops/SKILL.md"
+  13 | ];
+  14 | // Legacy header used by v0.4.x installs; recognized on uninstall.
+  15 | const GITIGNORE_LEGACY_HEADER = "# Token Ops session log";
+  16 | 
+  17 | export function installIntegration({ cwd, target, cliPath, nodePath, triggerMode = "smart", global = false }) {
+  18 |   const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex"]);
+  19 | 
+  20 |   if (!validTargets.has(target)) {
+  21 |     throw new Error("install target must be one of: all, claude, claude-hook, cursor, codex");
+  22 |   }
+  23 | 
+  24 |   if (global && target === "codex") {
+  25 |     throw new Error("--global is not supported for codex (AGENTS.md is project-scoped)");
+  26 |   }
+  27 | 
+  28 |   const installed = [];
+  29 |   const root = global ? homedir() : cwd;
+  30 |   // settings.local.json is host-specific (gitignored); settings.json is user-wide.
+  31 |   const claudeSettingsFile = global ? "settings.json" : "settings.local.json";
+  32 |   const displayPrefix = global ? "~" : "";
+  33 | 
+  34 |   if (target === "all" || target === "claude" || target === "claude-hook") {
+  35 |     const skillDir = join(root, ".claude", "skills", "token-ops");
+  36 |     mkdirSync(skillDir, { recursive: true });
+  37 |     writeFileSync(join(skillDir, "SKILL.md"), renderClaudeSkill(cliPath));
+  38 |     installed.push(`${displayPrefix}/.claude/skills/token-ops/SKILL.md`.replace(/^\//, ""));
+  39 |   }
+  40 | 
+  41 |   if (target === "all" || target === "claude-hook") {
+  42 |     const settingsPath = join(root, ".claude", claudeSettingsFile);
+  43 |     mkdirSync(join(root, ".claude"), { recursive: true });
+  44 |     writeFileSync(settingsPath, renderClaudeHookSettings(settingsPath, cliPath, triggerMode, nodePath));
+  45 |     installed.push(`${displayPrefix}/.claude/${claudeSettingsFile}`.replace(/^\//, ""));
+  46 |   }
+  47 | 
+  48 |   if (target === "all" || target === "cursor") {
+  49 |     if (global) {
+  50 |       // User Rules are GUI-only; only the MCP entry can be installed from disk.
 ```
