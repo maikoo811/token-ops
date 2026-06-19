@@ -408,9 +408,10 @@ Options:
                                   TTY mode hides them; piped / file output always
                                   includes them.
   --lang <auto|en|ja>             Output language for packs and reports (default: ${DEFAULT_LANG})
-  --trigger-mode <smart|aggressive>  Hook firing policy. smart (default) requires a
-                                  coding keyword; aggressive fires on any prompt that
-                                  is at least 6 chars and not self-referential
+  --trigger-mode <all|smart>      Hook firing policy. all (default) fires on any
+                                  prompt that is at least 6 chars and not
+                                  self-referential; smart only fires on prompts
+                                  that contain a coding keyword.
   --global                        (install / uninstall) Write to your home directory
                                   (~/.claude/, ~/.cursor/) instead of the current
                                   project — applies the integration to all projects

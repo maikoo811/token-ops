@@ -103,7 +103,7 @@ token-ops install
 - `token-ops install cursor`: Cursorルールのみ
 - `token-ops install codex`: Codex `AGENTS.md`のみ
 
-`claude-hook`に`--trigger-mode aggressive`を付けると、6文字以上のどのプロンプトでも発火します(デフォルトはコーディング系キーワードが必要)。
+`claude-hook`に`--trigger-mode smart`を付けると、コーディング系キーワードを含むプロンプトのみで発火します(デフォルトは6文字以上のどのプロンプトでも発火)。
 
 ### グローバルインストール(任意)
 

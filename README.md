@@ -103,7 +103,7 @@ Default installs hooks/rules for Claude Code, Cursor, and Codex. To install only
 - `token-ops install cursor` — Cursor rule
 - `token-ops install codex` — Codex `AGENTS.md`
 
-Add `--trigger-mode aggressive` to `claude-hook` to fire on any prompt ≥ 6 chars (default requires a coding keyword).
+Add `--trigger-mode smart` to `claude-hook` to fire only when the prompt contains a coding keyword (default fires on any prompt ≥ 6 chars).
 
 ### Install globally (optional)
 

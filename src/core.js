@@ -391,8 +391,8 @@ export function renderSavingsReport(report, lang = "en") {
   ].join("\n");
 }
 
-export const TRIGGER_MODES = new Set(["smart", "aggressive"]);
-export const DEFAULT_TRIGGER_MODE = "smart";
+export const TRIGGER_MODES = new Set(["all", "smart"]);
+export const DEFAULT_TRIGGER_MODE = "all";
 
 export function readTriggerMode(value) {
   if (!TRIGGER_MODES.has(value)) {
@@ -408,7 +408,7 @@ export function shouldInjectForPrompt(prompt, mode = DEFAULT_TRIGGER_MODE) {
   if (prompt.includes("token-ops")) {
     return false;
   }
-  if (mode === "aggressive") {
+  if (mode === "all") {
     return true;
   }
   // \b for English (so `fix` doesn't match `prefix`); CJK doesn't use \b reliably.
