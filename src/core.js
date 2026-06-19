@@ -503,11 +503,15 @@ export function validateCwd(raw) {
   try {
     resolved = realpathSync(raw);
   } catch {
-    throw new Error(`cwd does not exist: ${raw}`);
+    throw new Error(
+      `cwd does not exist: ${raw}. Pass cwd as an absolute path to the project root (the directory containing .git).`
+    );
   }
 
   if (!statSync(resolved).isDirectory()) {
-    throw new Error(`cwd is not a directory: ${raw}`);
+    throw new Error(
+      `cwd is not a directory: ${raw}. Pass cwd as an absolute path to the project root (the directory containing .git).`
+    );
   }
 
   try {
@@ -517,7 +521,9 @@ export function validateCwd(raw) {
       timeout: GIT_TIMEOUT_MS
     });
   } catch {
-    throw new Error(`cwd is not a git repository: ${raw}`);
+    throw new Error(
+      `cwd is not a git repository: ${raw}. Pass cwd as the workspace root (the directory containing .git).`
+    );
   }
 
   return resolved;

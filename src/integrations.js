@@ -378,6 +378,8 @@ Prefer this order:
 3. Call \`list_high_cost_files\` before opening large files, generated files, lockfiles, or logs.
 4. Call \`report_saved_tokens\` when the user asks about cost, tokens, usage, or savings.
 
+When calling any Token Ops MCP tool, always pass \`cwd\` as the absolute path to the project root (the directory containing \`.git\`). Infer it from recent file paths in the conversation or the workspace folder — for example, if files appear as \`src/foo.ts\`, the cwd is the parent directory that holds both \`src/\` and \`.git/\`. Without \`cwd\` the call fails in Cursor.
+
 Avoid reading broad repository context until Token Ops output is insufficient for the task.
 `;
 }
