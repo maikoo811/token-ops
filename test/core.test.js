@@ -151,7 +151,7 @@ test("finalizeTokenBudget: handles zero baselines without dividing by zero", () 
 
 test("shouldInjectForPrompt: requires English word boundaries", () => {
   assert.equal(shouldInjectForPrompt("Please fix the parser"), true);
-  assert.equal(shouldInjectForPrompt("Reading the prefix list"), false, "`prefix` must not match `fix`");
+  assert.equal(shouldInjectForPrompt("Reading the prefix data"), false, "`prefix` must not match `fix`");
   assert.equal(shouldInjectForPrompt("This is a fixture file"), false, "`fixture` must not match `fix`");
   assert.equal(shouldInjectForPrompt("Mailing address question"), false, "`address` must not match `add`");
   assert.equal(shouldInjectForPrompt("Run the test fixture"), true, "`test` standalone still triggers");
