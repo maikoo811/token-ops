@@ -14,7 +14,7 @@ const GITIGNORE_ENTRIES = [
 // Legacy header used by v0.4.x installs; recognized on uninstall.
 const GITIGNORE_LEGACY_HEADER = "# Token Ops session log";
 
-export function installIntegration({ cwd, target, cliPath, nodePath, triggerMode = "smart", global = false }) {
+export function installIntegration({ cwd, target, cliPath, nodePath, triggerMode = "all", global = false }) {
   const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex"]);
 
   if (!validTargets.has(target)) {
@@ -399,10 +399,10 @@ Use that compact context first. Read additional files only when the pack is insu
 `;
 }
 
-function renderClaudeHookSettings(settingsPath, cliPath, triggerMode = "smart", nodePath) {
+function renderClaudeHookSettings(settingsPath, cliPath, triggerMode = "all", nodePath) {
   const existing = readExistingSettings(settingsPath);
   const args = [cliPath, "hook", "claude-user-prompt-submit"];
-  if (triggerMode && triggerMode !== "smart") {
+  if (triggerMode && triggerMode !== "all") {
     args.push("--trigger-mode", triggerMode);
   }
   const command = typeof nodePath === "string" && nodePath.length > 0 ? nodePath : "node";

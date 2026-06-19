@@ -255,10 +255,10 @@ test("install upgrades a v0.4.x-style gitignore block (legacy header + only .tok
   assert.equal(tokenOpsCount, 1, "must not duplicate .token-ops/ when upgrading");
 });
 
-test("install claude-hook --trigger-mode aggressive bakes the flag into settings", () => {
+test("install claude-hook --trigger-mode smart bakes the flag into settings", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-trigger-mode-"));
 
-  execFileSync(process.execPath, [cli, "install", "claude-hook", "--trigger-mode", "aggressive"], {
+  execFileSync(process.execPath, [cli, "install", "claude-hook", "--trigger-mode", "smart"], {
     cwd,
     encoding: "utf8"
   });
@@ -268,10 +268,10 @@ test("install claude-hook --trigger-mode aggressive bakes the flag into settings
   const args = entry.hooks[0].args;
 
   assert.ok(args.includes("--trigger-mode"), "args should include --trigger-mode flag");
-  assert.equal(args[args.indexOf("--trigger-mode") + 1], "aggressive");
+  assert.equal(args[args.indexOf("--trigger-mode") + 1], "smart");
 });
 
-test("install claude-hook (default smart mode) omits --trigger-mode flag", () => {
+test("install claude-hook (default all mode) omits --trigger-mode flag", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-trigger-default-"));
 
   execFileSync(process.execPath, [cli, "install", "claude-hook"], { cwd, encoding: "utf8" });
@@ -279,7 +279,7 @@ test("install claude-hook (default smart mode) omits --trigger-mode flag", () =>
   const settings = JSON.parse(readFileSync(join(cwd, ".claude", "settings.local.json"), "utf8"));
   const args = settings.hooks.UserPromptSubmit[0].hooks[0].args;
 
-  assert.ok(!args.includes("--trigger-mode"), "default smart mode should not write the flag");
+  assert.ok(!args.includes("--trigger-mode"), "default all mode should not write the flag");
 });
 
 // ---- AST-based snippet boundary detection (JS/TS) ----
@@ -576,29 +576,29 @@ test("install claude-hook bakes the absolute path to node into command (GUI-laun
     "path must be absolute (POSIX or Windows-style)");
 });
 
-test("hook respects --trigger-mode aggressive (fires on prompts without trigger words)", () => {
-  const cwd = mkdtempSync(join(tmpdir(), "token-ops-hook-aggressive-"));
+test("hook default (all mode) fires even on prompts without coding keywords", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-hook-default-"));
   execFileSync("git", ["init"], { cwd, stdio: "ignore" });
   writeFileSync(join(cwd, "README.md"), "# Demo\n\nSome project notes.\n");
 
-  // Prompt with no coding keywords — smart mode would reject it.
+  // Prompt with no coding keywords — smart mode would reject it; default (all) fires.
   const prompt = "How does this project work?";
 
-  const smartOutput = execFileSync(
+  const defaultOutput = execFileSync(
     process.execPath,
     [cli, "hook", "claude-user-prompt-submit"],
     { cwd, encoding: "utf8", input: JSON.stringify({ cwd, prompt }) }
   );
-  assert.equal(smartOutput.trim(), "{}", "smart mode should reject prompt without trigger words");
-
-  const aggressiveOutput = execFileSync(
-    process.execPath,
-    [cli, "hook", "claude-user-prompt-submit", "--trigger-mode", "aggressive"],
-    { cwd, encoding: "utf8", input: JSON.stringify({ cwd, prompt }) }
-  );
-  const parsed = JSON.parse(aggressiveOutput);
+  const parsed = JSON.parse(defaultOutput);
   assert.equal(parsed.hookSpecificOutput.hookEventName, "UserPromptSubmit");
   assert.match(parsed.hookSpecificOutput.additionalContext, /Token Ops/);
+
+  const smartOutput = execFileSync(
+    process.execPath,
+    [cli, "hook", "claude-user-prompt-submit", "--trigger-mode", "smart"],
+    { cwd, encoding: "utf8", input: JSON.stringify({ cwd, prompt }) }
+  );
+  assert.equal(smartOutput.trim(), "{}", "smart mode should reject prompt without coding keywords");
 });
 
 test("uninstall removes everything install created", () => {

@@ -149,42 +149,39 @@ test("finalizeTokenBudget: handles zero baselines without dividing by zero", () 
 
 // ---- shouldInjectForPrompt ----
 
-test("shouldInjectForPrompt: requires English word boundaries", () => {
-  assert.equal(shouldInjectForPrompt("Please fix the parser"), true);
-  assert.equal(shouldInjectForPrompt("Reading the prefix data"), false, "`prefix` must not match `fix`");
-  assert.equal(shouldInjectForPrompt("This is a fixture file"), false, "`fixture` must not match `fix`");
-  assert.equal(shouldInjectForPrompt("Mailing address question"), false, "`address` must not match `add`");
-  assert.equal(shouldInjectForPrompt("Run the test fixture"), true, "`test` standalone still triggers");
+test("shouldInjectForPrompt: smart mode requires English word boundaries", () => {
+  assert.equal(shouldInjectForPrompt("Please fix the parser", "smart"), true);
+  assert.equal(shouldInjectForPrompt("Reading the prefix data", "smart"), false, "`prefix` must not match `fix`");
+  assert.equal(shouldInjectForPrompt("This is a fixture file", "smart"), false, "`fixture` must not match `fix`");
+  assert.equal(shouldInjectForPrompt("Mailing address question", "smart"), false, "`address` must not match `add`");
+  assert.equal(shouldInjectForPrompt("Run the test fixture", "smart"), true, "`test` standalone still triggers");
 });
 
-test("shouldInjectForPrompt: aggressive mode fires without trigger words", () => {
-  // Prompts that would be REJECTED in smart mode (no coding keywords)
-  assert.equal(shouldInjectForPrompt("How does this project work?", "aggressive"), true);
-  assert.equal(shouldInjectForPrompt("Explain the rationale here", "aggressive"), true);
-  assert.equal(shouldInjectForPrompt("どうやって動いているの", "aggressive"), true);
-  // Same in smart mode → false
+test("shouldInjectForPrompt: default (all) mode fires without trigger words", () => {
+  // Prompts with no coding keyword still fire under the default policy.
+  assert.equal(shouldInjectForPrompt("How does this project work?"), true);
+  assert.equal(shouldInjectForPrompt("Tell me about AlphaFold"), true);
+  assert.equal(shouldInjectForPrompt("どうやって動いているの"), true);
+  // Smart mode is the opt-in conservative filter → same prompts rejected.
   assert.equal(shouldInjectForPrompt("How does this project work?", "smart"), false);
   assert.equal(shouldInjectForPrompt("どうやって動いているの", "smart"), false);
 });
 
-test("shouldInjectForPrompt: aggressive mode still applies length + self-ref filters", () => {
-  assert.equal(shouldInjectForPrompt("ok", "aggressive"), false, "too short");
-  assert.equal(shouldInjectForPrompt("token-ops is great", "aggressive"), false, "self-reference");
-  assert.equal(shouldInjectForPrompt("", "aggressive"), false, "empty");
+test("shouldInjectForPrompt: all mode still applies length + self-ref filters", () => {
+  assert.equal(shouldInjectForPrompt("ok"), false, "too short");
+  assert.equal(shouldInjectForPrompt("token-ops is great"), false, "self-reference");
+  assert.equal(shouldInjectForPrompt(""), false, "empty");
 });
 
-test("shouldInjectForPrompt: fires for natural Japanese requests", () => {
-  assert.equal(shouldInjectForPrompt("バグを直して"), true);
-  assert.equal(shouldInjectForPrompt("不具合の修正"), true);
-  assert.equal(shouldInjectForPrompt("関数が動かない"), true);
-  assert.equal(shouldInjectForPrompt("壊れているので見て"), true);
+test("shouldInjectForPrompt: smart mode fires for natural Japanese requests", () => {
+  assert.equal(shouldInjectForPrompt("バグを直して", "smart"), true);
+  assert.equal(shouldInjectForPrompt("不具合の修正", "smart"), true);
+  assert.equal(shouldInjectForPrompt("関数が動かない", "smart"), true);
+  assert.equal(shouldInjectForPrompt("壊れているので見て", "smart"), true);
 });
 
-test("shouldInjectForPrompt: skips trivial, self-referential, or empty prompts", () => {
-  assert.equal(shouldInjectForPrompt(""), false);
-  assert.equal(shouldInjectForPrompt("ok"), false);
-  assert.equal(shouldInjectForPrompt("ありがとう"), false, "no trigger keyword");
-  assert.equal(shouldInjectForPrompt("token-opsを試したい"), false, "self-reference is excluded");
+test("shouldInjectForPrompt: smart mode skips prompts with no keyword hit", () => {
+  assert.equal(shouldInjectForPrompt("ありがとうございます", "smart"), false, "no trigger keyword");
 });
 
 // ---- resolveLanguage ----
