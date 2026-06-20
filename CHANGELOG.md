@@ -5,6 +5,11 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] — 2026-06-20
+
+### Added
+- `token-ops --version` / `token-ops -v` prints the installed version. Previously users had to fall back to `npm list -g token-ops` to confirm which build was on disk. (#75)
+
 ## [0.6.3] — 2026-06-20
 
 ### Fixed
