@@ -79,6 +79,8 @@ xychart-beta
 
 ## クイックスタート
 
+> **前提:** git がインストール済み、かつプロジェクトが git repo として初期化済み(まだなら `git init`)。リモート不要。
+
 > 💡 **最も簡単: AIに任せる。** Claude Code・Cursor・シェルアクセスを持つAIツールに以下を貼り付けてください:
 > `このプロジェクトにToken Opsをインストールして: https://github.com/maikoo811/token-ops`
 >

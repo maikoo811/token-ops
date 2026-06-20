@@ -79,6 +79,8 @@ A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pa
 
 ## Quick Start
 
+> **Prerequisites:** git installed, and the project initialized as a git repo (`git init` if not). No remote required.
+
 > 💡 **Easiest: ask your AI.** Paste this in Claude Code, Cursor, or any AI tool with shell access:
 > `Install Token Ops in this project: https://github.com/maikoo811/token-ops`
 >
