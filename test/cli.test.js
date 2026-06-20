@@ -15,6 +15,14 @@ test("prints help", () => {
   assert.match(output, /pack/);
 });
 
+test("prints version", () => {
+  const expected = JSON.parse(readFileSync(resolve("package.json"), "utf8")).version;
+  for (const flag of ["--version", "-v"]) {
+    const output = execFileSync(process.execPath, [cli, flag], { encoding: "utf8" });
+    assert.equal(output.trim(), expected, `${flag} should print the package.json version`);
+  }
+});
+
 test("builds a compact context pack from a git repository", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-"));
   execFileSync("git", ["init"], { cwd, stdio: "ignore" });
