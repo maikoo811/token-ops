@@ -5,6 +5,14 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] — 2026-06-20
+
+### Fixed
+- `token-ops install cursor --global` now realpath-resolves the CLI symlink before computing the MCP server path. Previously, global npm installs wrote a non-existent path (`<prefix>/mcp/server.js` instead of `<prefix>/lib/node_modules/token-ops/mcp/server.js`) into `~/.cursor/mcp.json`, so Cursor silently failed to start the MCP server and `build_compact_context` never fired. (#72)
+
+### Changed
+- README Quick Start now states upfront that Token Ops requires git (`git init` if not already a repo, no remote needed)
+
 ## [0.6.2] — 2026-06-08
 
 ### Added
