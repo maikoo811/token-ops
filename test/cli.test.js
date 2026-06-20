@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -560,6 +560,35 @@ test("install cursor --global writes to ~/.cursor/mcp.json and prints the User R
   assert.match(out, /User Rules/);
   // No file-based rule should be written under project either
   assert.equal(existsSync(join(cwd, ".cursor")), false);
+});
+
+// Regression test for #72: global npm installs put `token-ops` at
+// <prefix>/bin/token-ops as a symlink to
+// <prefix>/lib/node_modules/token-ops/bin/token-ops.js. Earlier versions
+// computed the MCP server path with `dirname(dirname(process.argv[1]))`
+// without realpath-resolving the symlink, so the written path landed at
+// <prefix>/mcp/server.js — a file that does not exist. Cursor then silently
+// failed to start the MCP server. This test invokes the CLI through a
+// symlink and asserts the resulting mcp.json points at a real file.
+test("install cursor --global resolves a symlinked cli to the real mcp server path", () => {
+  const fakeHome = mkdtempSync(join(tmpdir(), "token-ops-cursor-symlink-home-"));
+  const fakeBinDir = mkdtempSync(join(tmpdir(), "token-ops-cursor-symlink-bin-"));
+  const symlinkedCli = join(fakeBinDir, "token-ops");
+  symlinkSync(cli, symlinkedCli);
+
+  execFileSync(
+    process.execPath,
+    [symlinkedCli, "install", "cursor", "--global"],
+    { cwd: fakeBinDir, encoding: "utf8", env: { ...process.env, HOME: fakeHome } }
+  );
+
+  const mcp = JSON.parse(readFileSync(join(fakeHome, ".cursor", "mcp.json"), "utf8"));
+  const serverPath = mcp.mcpServers["token-ops"].args[0];
+  assert.equal(
+    existsSync(serverPath),
+    true,
+    `MCP server path ${serverPath} should point to a real file (symlinked cli must be realpath-resolved)`
+  );
 });
 
 test("install claude-hook bakes the absolute path to node into command (GUI-launchable)", () => {
