@@ -13,7 +13,8 @@ if (NODE_MAJOR < 18) {
 }
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   DEFAULT_LANG,
   DEFAULT_MAX_FILES,
@@ -48,6 +49,13 @@ const command = args.shift();
 try {
   if (!command || command === "-h" || command === "--help") {
     printHelp();
+    process.exit(0);
+  }
+
+  if (command === "--version" || command === "-v") {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8"));
+    console.log(pkg.version);
     process.exit(0);
   }
 
@@ -417,6 +425,7 @@ Options:
                                   project — applies the integration to all projects
                                   at once. Not supported for the codex target.
   -h, --help                      Show help
+  -v, --version                   Print the installed token-ops version
 `);
 }
 
