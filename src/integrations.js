@@ -276,11 +276,7 @@ function renderCursorGlobalMcp(mcpJsonPath, cliPath, nodePath) {
     ? safeReadJson(mcpJsonPath, "Cursor mcp.json")
     : {};
   existing.mcpServers = existing.mcpServers || {};
-  // Global npm installs put the package under
-  // <prefix>/lib/node_modules/token-ops/ but expose the CLI through a symlink
-  // at <prefix>/bin/token-ops. process.argv[1] is the symlink path, so
-  // dirname(dirname(...)) without realpath lands at <prefix>, not the package
-  // root, and the resulting mcp/server.js path does not exist.
+  // argv[1] is the bin symlink under global npm installs; realpath gets us to the package root.
   const realCliPath = realpathSync(cliPath);
   const mcpServerPath = join(dirname(dirname(realCliPath)), "mcp", "server.js");
   existing.mcpServers["token-ops"] = {

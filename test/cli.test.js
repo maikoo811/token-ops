@@ -562,14 +562,7 @@ test("install cursor --global writes to ~/.cursor/mcp.json and prints the User R
   assert.equal(existsSync(join(cwd, ".cursor")), false);
 });
 
-// Regression test for #72: global npm installs put `token-ops` at
-// <prefix>/bin/token-ops as a symlink to
-// <prefix>/lib/node_modules/token-ops/bin/token-ops.js. Earlier versions
-// computed the MCP server path with `dirname(dirname(process.argv[1]))`
-// without realpath-resolving the symlink, so the written path landed at
-// <prefix>/mcp/server.js — a file that does not exist. Cursor then silently
-// failed to start the MCP server. This test invokes the CLI through a
-// symlink and asserts the resulting mcp.json points at a real file.
+// Regression for #72: without realpath, the computed mcp/server.js path landed outside the package.
 test("install cursor --global resolves a symlinked cli to the real mcp server path", () => {
   const fakeHome = mkdtempSync(join(tmpdir(), "token-ops-cursor-symlink-home-"));
   const fakeBinDir = mkdtempSync(join(tmpdir(), "token-ops-cursor-symlink-bin-"));
