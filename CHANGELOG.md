@@ -5,6 +5,11 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5] — 2026-06-21
+
+### Fixed
+- `token-ops report` headline numbers now reconcile: the saved figure is derived from the aggregated without/with totals (`未使用 − 使用 = 節約`) instead of summing per-entry `savedTokens`, which is clamped at 0 and overstated the total whenever a run's pack exceeded reading its selected files in full. (#80)
+
 ## [0.6.4] — 2026-06-20
 
 ### Added
