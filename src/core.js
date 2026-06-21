@@ -364,8 +364,10 @@ export function colorizeForTty(markdown, enabled = false) {
 }
 
 export function renderSavingsReport(report, lang = "en") {
+  // Recompute from totals so the lines reconcile; per-entry savedTokens is clamped at 0 (#80).
+  const saved = Math.max(0, report.selectedFullTokens - report.packTokens);
   const pct = report.selectedFullTokens > 0
-    ? Math.round((report.savedTokens / report.selectedFullTokens) * 100)
+    ? Math.round((saved / report.selectedFullTokens) * 100)
     : 0;
 
   if (lang === "ja") {
@@ -375,7 +377,7 @@ export function renderSavingsReport(report, lang = "en") {
       `- 実行回数: ${formatNumber(report.events)}`,
       `- Token Ops未使用時(推定): ~${formatNumber(report.selectedFullTokens)} tokens`,
       `- Token Ops使用時: ~${formatNumber(report.packTokens)} tokens`,
-      `- 節約見込み(最大): ~${formatNumber(report.savedTokens)} tokens (${pct}%)`,
+      `- 節約見込み(最大): ~${formatNumber(saved)} tokens (${pct}%)`,
       `- 記録ファイル: ${report.path}`
     ].join("\n");
   }
@@ -386,7 +388,7 @@ export function renderSavingsReport(report, lang = "en") {
     `- Runs: ${formatNumber(report.events)}`,
     `- Without Token Ops (est.): ~${formatNumber(report.selectedFullTokens)} tokens`,
     `- With Token Ops: ~${formatNumber(report.packTokens)} tokens`,
-    `- Saved (max): ~${formatNumber(report.savedTokens)} tokens (${pct}%)`,
+    `- Saved (max): ~${formatNumber(saved)} tokens (${pct}%)`,
     `- Log: ${report.path}`
   ].join("\n");
 }
