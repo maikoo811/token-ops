@@ -11,6 +11,7 @@ import {
   finalizeTokenBudget,
   simplifyForTerminal,
   readSavingsReport,
+  renderSavingsReport,
   recordSessionEvent,
   SESSION_LOG_KEEP_LINES,
   SESSION_LOG_MAX_BYTES,
@@ -444,6 +445,29 @@ test("readSavingsReport refuses to read session.jsonl when it's a symlink escapi
   assert.equal(report.events, 0, "must not count records from a symlinked-external log");
   assert.equal(report.savedTokens, 0, "must not surface savedTokens from outside cwd");
   assert.equal(report.packTokens, 0);
+});
+
+test("renderSavingsReport headline reconciles when an entry's pack exceeded its selected-full read (#80)", () => {
+  // savedTokens is the inflated clamped sum; the reconciling figure is 114,936 − 6,670.
+  const report = {
+    events: 3,
+    savedTokens: 108_674,
+    packTokens: 6_670,
+    selectedFullTokens: 114_936,
+    repoSavedTokens: 0,
+    path: "/tmp/session.jsonl"
+  };
+
+  for (const lang of ["en", "ja"]) {
+    const out = renderSavingsReport(report, lang);
+    // The three token figures appear in order: without, with, saved.
+    const [without, withTokenOps, saved] = [...out.matchAll(/~([\d,]+) tokens/g)]
+      .map((m) => Number(m[1].replace(/,/g, "")));
+    assert.equal(without, 114_936, `${lang}: without total`);
+    assert.equal(withTokenOps, 6_670, `${lang}: with total`);
+    assert.equal(without - withTokenOps, saved, `${lang}: headline must reconcile`);
+    assert.equal(saved, 108_266, `${lang}: saved derived from totals, not clamped sum`);
+  }
 });
 
 test("recordSessionEvent refuses to append when session.jsonl is a symlink escaping cwd", { skip: skipSymlinkTests }, () => {
