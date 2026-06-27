@@ -5,6 +5,14 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.6] — 2026-06-27
+
+### Added
+- `token-ops handoff` prints a session-handoff prompt template (EN/JA via `--lang`) to paste into the current AI session before switching to a fresh one. Kept out of README on purpose so it never leaks into ranked packs. (#79)
+
+### Changed
+- Internal helper `listTrackedFiles` renamed to `listVisibleFiles` — it returns tracked + untracked-but-not-gitignored files, not just tracked. No behavior change. (#71)
+
 ## [0.6.5] — 2026-06-21
 
 ### Fixed
