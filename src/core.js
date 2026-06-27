@@ -393,6 +393,37 @@ export function renderSavingsReport(report, lang = "en") {
   ].join("\n");
 }
 
+// A prompt the user pastes into the current AI session to get a handoff summary
+// for the next one. Kept out of README on purpose: README is ranked into packs,
+// so documenting the template there would leak it into every session (#79).
+export function renderHandoffPrompt(lang = "en") {
+  if (lang === "ja") {
+    return [
+      "このセッションを次のチャットに引き継ぐためのハンドオフを作って:",
+      "",
+      "1. やったこと(主な変更・PR・コミット)",
+      "2. 決めたこと(技術判断・トレードオフの理由)",
+      "3. 現状(ブランチ・テスト・PR の状態)",
+      "4. 次のステップ(残タスク・ブロッカー)",
+      "5. 重要な文脈(忘れたら困るユーザー指示・暗黙のルール)",
+      "",
+      "箇条書きで、新セッションに貼ればそのまま使えるように。"
+    ].join("\n");
+  }
+
+  return [
+    "Write a handoff to carry this session into the next chat:",
+    "",
+    "1. What was done (key changes, PRs, commits)",
+    "2. What was decided (technical calls and the reasons/trade-offs)",
+    "3. Current state (branch, tests, PR status)",
+    "4. Next steps (remaining tasks, blockers)",
+    "5. Important context (user instructions and implicit rules worth keeping)",
+    "",
+    "Use bullet points, ready to paste as the first message of a new session."
+  ].join("\n");
+}
+
 export const TRIGGER_MODES = new Set(["all", "smart"]);
 export const DEFAULT_TRIGGER_MODE = "all";
 
