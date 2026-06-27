@@ -149,7 +149,7 @@ const TEXT_EXTENSIONS = new Set([
 ]);
 
 export function generatePack({ task, cwd, maxFiles = DEFAULT_MAX_FILES, maxLines = DEFAULT_MAX_LINES, lang = "en" }) {
-  const files = listTrackedFiles(cwd);
+  const files = listVisibleFiles(cwd);
   const git = readGitState(cwd);
   const keywords = extractKeywords(task);
   const rankedFiles = rankFiles(files, keywords, git.changedFiles, cwd);
@@ -170,7 +170,7 @@ export function generatePack({ task, cwd, maxFiles = DEFAULT_MAX_FILES, maxLines
 }
 
 export function estimateContextCost({ cwd, task = "", maxFiles = DEFAULT_MAX_FILES }) {
-  const files = listTrackedFiles(cwd);
+  const files = listVisibleFiles(cwd);
   const git = readGitState(cwd);
   const keywords = extractKeywords(task);
   const rankedFiles = rankFiles(files, keywords, git.changedFiles, cwd).slice(0, maxFiles);
@@ -187,7 +187,7 @@ export function estimateContextCost({ cwd, task = "", maxFiles = DEFAULT_MAX_FIL
 }
 
 export function listHighCostFiles({ cwd, limit = 12 }) {
-  return listTrackedFiles(cwd)
+  return listVisibleFiles(cwd)
     .map((file) => ({
       file,
       estimatedTokens: estimateTokens(readSmallFile(join(cwd, file)))
@@ -449,7 +449,9 @@ function hasJapanese(text) {
   return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text);
 }
 
-function listTrackedFiles(cwd) {
+// Returns tracked + untracked-but-not-gitignored files (everything visible in
+// the working tree minus .gitignore matches), not just git-tracked files.
+function listVisibleFiles(cwd) {
   const output = runGit(["ls-files", "--cached", "--others", "--exclude-standard"], cwd);
   const allLines = output.split("\n").map((line) => line.trim()).filter(Boolean);
 
