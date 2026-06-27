@@ -29,6 +29,7 @@ import {
   readSavingsReport,
   readTriggerMode,
   recordSessionEvent,
+  renderHandoffPrompt,
   renderSavingsReport,
   resolveLanguage,
   shouldInjectForPrompt,
@@ -76,6 +77,11 @@ try {
 
   if (command === "report") {
     runReport(args);
+    process.exit(0);
+  }
+
+  if (command === "handoff") {
+    runHandoff(args);
     process.exit(0);
   }
 
@@ -305,6 +311,11 @@ function runReport(values) {
   process.stdout.write(`${colorizeForTty(markdown, process.stdout.isTTY === true)}\n`);
 }
 
+function runHandoff(values) {
+  const lang = resolveLanguage(parseLangOnly(values), "");
+  process.stdout.write(`${renderHandoffPrompt(lang)}\n`);
+}
+
 function runCost(values) {
   const options = parsePackArgs(values);
   const result = estimateContextCost({
@@ -393,6 +404,7 @@ function printHelp() {
 Usage:
   token-ops pack "Fix the CSV import bug"
   token-ops report
+  token-ops handoff
   token-ops cost "Fix the CSV import bug"
   token-ops high-cost-files --limit 12
   token-ops install

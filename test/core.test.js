@@ -12,6 +12,7 @@ import {
   simplifyForTerminal,
   readSavingsReport,
   renderSavingsReport,
+  renderHandoffPrompt,
   recordSessionEvent,
   SESSION_LOG_KEEP_LINES,
   SESSION_LOG_MAX_BYTES,
@@ -468,6 +469,21 @@ test("renderSavingsReport headline reconciles when an entry's pack exceeded its 
     assert.equal(without - withTokenOps, saved, `${lang}: headline must reconcile`);
     assert.equal(saved, 108_266, `${lang}: saved derived from totals, not clamped sum`);
   }
+});
+
+test("renderHandoffPrompt covers the five handoff sections in both languages (#79)", () => {
+  const ja = renderHandoffPrompt("ja");
+  for (const heading of ["やったこと", "決めたこと", "現状", "次のステップ", "重要な文脈"]) {
+    assert.ok(ja.includes(heading), `JA handoff must mention ${heading}`);
+  }
+
+  const en = renderHandoffPrompt("en");
+  for (const heading of ["What was done", "What was decided", "Current state", "Next steps", "Important context"]) {
+    assert.ok(en.includes(heading), `EN handoff must mention ${heading}`);
+  }
+
+  // Default is English (matches resolveLanguage's empty-task behavior).
+  assert.equal(renderHandoffPrompt(), en);
 });
 
 test("recordSessionEvent refuses to append when session.jsonl is a symlink escaping cwd", { skip: skipSymlinkTests }, () => {
