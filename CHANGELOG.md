@@ -5,6 +5,14 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.8] — 2026-07-03
+
+### Added
+- `token-ops audit` parses the current project's local Claude Code transcripts and reports measured context fetching (Read / bash viewing / Grep / Glob / bash search token counts), Token Ops MCP tool usage, count- and token-weighted compliance rates, and an upper-bound counterfactual for snippet-capped reads. Read-only, current project only, aggregates only — no prompt text or file content in the report. (#90)
+
+### Changed
+- Rewrote MCP tool descriptions, the Cursor rule, the Codex `AGENTS.md` block, and `SKILL.md` toward clearer compliance principles (lead with when-to-call, one-sentence reason, no claim of replacing the built-in Read/Grep tools since no such tool exists yet). Added an `instructions` field to the MCP `initialize` response for clients that read it (e.g. Codex). (#92)
+
 ## [0.6.7] — 2026-07-02
 
 ### Changed
