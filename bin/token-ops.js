@@ -43,6 +43,7 @@ import {
   renderCursorRule,
   uninstallIntegration
 } from "../src/integrations.js";
+import { runAudit, renderAuditReport } from "../src/audit.js";
 
 const args = process.argv.slice(2);
 const command = args.shift();
@@ -82,6 +83,11 @@ try {
 
   if (command === "handoff") {
     runHandoff(args);
+    process.exit(0);
+  }
+
+  if (command === "audit") {
+    await runAuditCommand(args);
     process.exit(0);
   }
 
@@ -316,6 +322,12 @@ function runHandoff(values) {
   process.stdout.write(`${renderHandoffPrompt(lang)}\n`);
 }
 
+async function runAuditCommand(values) {
+  const lang = resolveLanguage(parseLangOnly(values), "");
+  const result = await runAudit(process.cwd());
+  process.stdout.write(`${renderAuditReport(result, lang)}\n`);
+}
+
 function runCost(values) {
   const options = parsePackArgs(values);
   const result = estimateContextCost({
@@ -405,6 +417,7 @@ Usage:
   token-ops pack "Fix the CSV import bug"
   token-ops report
   token-ops handoff
+  token-ops audit
   token-ops cost "Fix the CSV import bug"
   token-ops high-cost-files --limit 12
   token-ops install
