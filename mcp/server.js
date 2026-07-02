@@ -248,7 +248,7 @@ function tools() {
   return [
     {
       name: "build_compact_context",
-      description: "Call this before broad repository exploration, including quick one-line checks. Returns a compact, task-relevant context pack (ranked files + snippets) so you can skip reading files that turn out irrelevant.",
+      description: "Call this before broad repository exploration. Returns a compact, task-relevant context pack (ranked files + snippets) so you can skip reading files that turn out irrelevant.",
       inputSchema: {
         type: "object",
         properties: {

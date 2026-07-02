@@ -373,7 +373,7 @@ alwaysApply: true
 
 Use Token Ops before broad repository exploration, large file reads, or noisy test-log analysis — it cuts wasted context. Prefer this order:
 
-1. Call \`build_compact_context\` for the current task, including quick one-line checks.
+1. Call \`build_compact_context\` for the current task.
 2. Use the returned snippets and token budget before reading more files.
 3. Call \`list_high_cost_files\` before opening large files, generated files, lockfiles, or logs.
 4. Call \`report_saved_tokens\` when the user asks about cost, tokens, usage, or savings.
@@ -386,7 +386,7 @@ export function renderCodexInstructions() {
   return `<!-- token-ops:start -->
 ## Token Ops
 
-Before broad repository exploration for implementation, debugging, review, or testing tasks — including quick one-line checks — run this to cut wasted context:
+Before broad repository exploration for implementation, debugging, review, or testing tasks, run this to cut wasted context:
 
 \`\`\`sh
 token-ops pack "<user task>" --max-files 5 --max-lines 50

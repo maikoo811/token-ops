@@ -9,11 +9,26 @@ import { isNvmManagedNode, renderCursorRule, renderCodexInstructions } from "../
 
 const cli = resolve("bin/token-ops.js");
 
+// No Read/Grep replacement tool exists yet, so claiming one would mislead the agent.
+// Kept in sync with the copy in test/mcp.test.js (tool descriptions).
+const REPLACEMENT_CLAIM = /(instead of|in place of|rather than|replaces?|not)\s+(the )?(built-in )?(Read|Grep)\b/i;
+
 test("rule text does not claim to replace the built-in Read/Grep tools (#92)", () => {
-  // No such replacement tool exists yet, so claiming one would mislead the agent.
-  const forbidden = /instead of (the )?(built-in )?(Read|Grep)\b/i;
-  assert.doesNotMatch(renderCursorRule(), forbidden);
-  assert.doesNotMatch(renderCodexInstructions(), forbidden);
+  assert.doesNotMatch(renderCursorRule(), REPLACEMENT_CLAIM);
+  assert.doesNotMatch(renderCodexInstructions(), REPLACEMENT_CLAIM);
+  assert.doesNotMatch(readFileSync(resolve("skills/token-ops/SKILL.md"), "utf8"), REPLACEMENT_CLAIM);
+});
+
+test("README copy-paste rule blocks stay in sync with renderCursorRule (#93)", () => {
+  // This block drifted from the renderer twice before. The paste block is
+  // plain text (no .mdc frontmatter, no backticks); compare the rest verbatim.
+  const rendered = renderCursorRule().split(/^---$/m)[2].trim().replaceAll("`", "");
+  for (const readme of ["README.md", "README.ja.md"]) {
+    const content = readFileSync(resolve(readme), "utf8");
+    const block = content.split("```").find((part) => part.trim().startsWith("Use Token Ops"));
+    assert.ok(block, `${readme}: paste block starting with "Use Token Ops" not found`);
+    assert.equal(block.trim(), rendered, `${readme}: paste block drifted from renderCursorRule()`);
+  }
 });
 
 test("prints help", () => {

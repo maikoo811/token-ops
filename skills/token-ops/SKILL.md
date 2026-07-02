@@ -11,7 +11,7 @@ It is beginner friendly: no API key, no account, no cloud backend, and no setup 
 
 ## Use It When
 
-- The task may require exploring several files, including a quick one-line check.
+- The task may require exploring several files.
 - The user mentions tokens, costs, context, Cursor usage, or expensive AI coding.
 - You are about to read a large file, lockfile, generated file, build output, or long test log.
 - The user asks for a savings report.

@@ -78,6 +78,23 @@ test("MCP server lists tools via newline-delimited JSON", async () => {
   ]);
 });
 
+test("tool descriptions do not claim to replace the built-in Read/Grep tools (#92)", async () => {
+  // Kept in sync with the copy in test/cli.test.js (rule renderers).
+  const REPLACEMENT_CLAIM = /(instead of|in place of|rather than|replaces?|not)\s+(the )?(built-in )?(Read|Grep)\b/i;
+  const initLine = `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} })}\n`;
+  const listLine = `${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} })}\n`;
+
+  const { stdout } = await runServer(initLine + listLine);
+  const lines = stdout.trim().split("\n").map((line) => JSON.parse(line));
+  const listing = lines.find((line) => line.id === 2);
+  const init = lines.find((line) => line.id === 1);
+
+  for (const tool of listing.result.tools) {
+    assert.doesNotMatch(tool.description, REPLACEMENT_CLAIM, `${tool.name} description`);
+  }
+  assert.doesNotMatch(init.result.instructions, REPLACEMENT_CLAIM, "server instructions");
+});
+
 test("MCP server also accepts legacy Content-Length framing", async () => {
   const body = JSON.stringify({ jsonrpc: "2.0", id: 99, method: "initialize", params: {} });
   const payload = `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`;
