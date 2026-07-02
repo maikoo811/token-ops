@@ -158,7 +158,9 @@ function route(method, params) {
       serverInfo: {
         name: "token-ops",
         version: PACKAGE_VERSION
-      }
+      },
+      // Codex reads this for server-wide guidance; other clients' support is unconfirmed (#92).
+      instructions: "Prefer build_compact_context before broad repository exploration to reduce wasted context."
     };
   }
 
@@ -246,7 +248,7 @@ function tools() {
   return [
     {
       name: "build_compact_context",
-      description: "Create a small context pack before reading many files.",
+      description: "Call this before broad repository exploration. Returns a compact, task-relevant context pack (ranked files + snippets) so you can skip reading files that turn out irrelevant.",
       inputSchema: {
         type: "object",
         properties: {
@@ -261,7 +263,7 @@ function tools() {
     },
     {
       name: "estimate_context_cost",
-      description: "Estimate how expensive repository context may be.",
+      description: "Call this to preview the token cost of a task's relevant files before deciding how much to read.",
       inputSchema: {
         type: "object",
         properties: {
@@ -273,7 +275,7 @@ function tools() {
     },
     {
       name: "list_high_cost_files",
-      description: "List files that are expensive for Cursor to read.",
+      description: "Call this before opening large files, generated files, lockfiles, or logs, to see which ones cost the most tokens to read in full.",
       inputSchema: {
         type: "object",
         properties: {
@@ -284,7 +286,7 @@ function tools() {
     },
     {
       name: "report_saved_tokens",
-      description: "Show the local Token Ops savings report.",
+      description: "Call this when the user asks about tokens saved, usage, or cost. Shows the local Token Ops savings report.",
       inputSchema: {
         type: "object",
         properties: {

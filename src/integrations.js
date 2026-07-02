@@ -371,18 +371,14 @@ description: Reduce wasted context with Token Ops before broad exploration.
 alwaysApply: true
 ---
 
-Before broad repository exploration, large file reads, or noisy test-log analysis, use Token Ops if its MCP tools are available.
-
-Prefer this order:
+Use Token Ops before broad repository exploration, large file reads, or noisy test-log analysis — it cuts wasted context. Prefer this order:
 
 1. Call \`build_compact_context\` for the current task.
 2. Use the returned snippets and token budget before reading more files.
 3. Call \`list_high_cost_files\` before opening large files, generated files, lockfiles, or logs.
 4. Call \`report_saved_tokens\` when the user asks about cost, tokens, usage, or savings.
 
-When calling any Token Ops MCP tool, always pass \`cwd\` as the absolute path to the project root (the directory containing \`.git\`). Infer it from recent file paths in the conversation or the workspace folder — for example, if files appear as \`src/foo.ts\`, the cwd is the parent directory that holds both \`src/\` and \`.git/\`. Without \`cwd\` the call fails in Cursor.
-
-Avoid reading broad repository context until Token Ops output is insufficient for the task.
+Always pass \`cwd\` as the absolute path to the project root (the directory containing \`.git\`) — infer it from recent file paths or the workspace folder. Without \`cwd\` the call fails in Cursor.
 `;
 }
 
@@ -390,7 +386,7 @@ export function renderCodexInstructions() {
   return `<!-- token-ops:start -->
 ## Token Ops
 
-Before broad repository exploration for implementation, debugging, review, or testing tasks, run:
+Before broad repository exploration for implementation, debugging, review, or testing tasks, run this to cut wasted context:
 
 \`\`\`sh
 token-ops pack "<user task>" --max-files 5 --max-lines 50

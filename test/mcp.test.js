@@ -54,6 +54,8 @@ test("MCP server responds to initialize via newline-delimited JSON", async () =>
   assert.equal(response.id, 1);
   assert.equal(response.result.serverInfo.name, "token-ops");
   assert.match(response.result.serverInfo.version, /^\d+\.\d+\.\d+$/);
+  // Codex reads this field for server-wide guidance (#92).
+  assert.match(response.result.instructions, /build_compact_context/);
 });
 
 test("MCP server lists tools via newline-delimited JSON", async () => {
@@ -74,6 +76,23 @@ test("MCP server lists tools via newline-delimited JSON", async () => {
     "list_high_cost_files",
     "report_saved_tokens"
   ]);
+});
+
+test("tool descriptions do not claim to replace the built-in Read/Grep tools (#92)", async () => {
+  // Kept in sync with the copy in test/cli.test.js (rule renderers).
+  const REPLACEMENT_CLAIM = /(instead of|in place of|rather than|replaces?|not)\s+(the )?(built-in )?(Read|Grep)\b/i;
+  const initLine = `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} })}\n`;
+  const listLine = `${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} })}\n`;
+
+  const { stdout } = await runServer(initLine + listLine);
+  const lines = stdout.trim().split("\n").map((line) => JSON.parse(line));
+  const listing = lines.find((line) => line.id === 2);
+  const init = lines.find((line) => line.id === 1);
+
+  for (const tool of listing.result.tools) {
+    assert.doesNotMatch(tool.description, REPLACEMENT_CLAIM, `${tool.name} description`);
+  }
+  assert.doesNotMatch(init.result.instructions, REPLACEMENT_CLAIM, "server instructions");
 });
 
 test("MCP server also accepts legacy Content-Length framing", async () => {
