@@ -12,7 +12,7 @@ if (NODE_MAJOR < 18) {
   process.exit(1);
 }
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -43,7 +43,7 @@ import {
   renderCursorRule,
   uninstallIntegration
 } from "../src/integrations.js";
-import { runAudit, renderAuditReport } from "../src/audit.js";
+import { runAudit, renderAuditReport, extractObserveEvent } from "../src/audit.js";
 
 const args = process.argv.slice(2);
 const command = args.shift();
@@ -191,6 +191,16 @@ function runInstall(values) {
     );
   }
 
+  if (target === "observe") {
+    console.log(
+      "\nNote: Observation-only hooks. They record tool-call metadata (path, size,\n" +
+      "      time) to .token-ops/session.jsonl and never allow/deny — file contents\n" +
+      "      and command text are never stored. Run `token-ops audit` to see the\n" +
+      "      measured Cursor/Codex compliance. Restart Cursor/Codex to load the hooks.\n" +
+      "      Coverage is best-effort: Codex misses unified_exec shell calls."
+    );
+  }
+
   if (!global) {
     const tracked = findTrackedManagedFiles(process.cwd());
     if (tracked.length > 0) {
@@ -246,8 +256,13 @@ function runHook(values) {
     return;
   }
 
+  if (hookName === "cursor-observe" || hookName === "codex-observe") {
+    runObserveHook(hookName === "codex-observe" ? "codex" : "cursor");
+    return;
+  }
+
   if (hookName !== "claude-user-prompt-submit") {
-    fail("hook target must be: claude-user-prompt-submit");
+    fail("hook target must be one of: claude-user-prompt-submit, cursor-observe, codex-observe");
   }
 
   const triggerModeIndex = values.findIndex((value) => value === "--trigger-mode");
@@ -309,6 +324,55 @@ function runHook(values) {
       ].join("\n")
     }
   }));
+}
+
+// Observation-only hook for Cursor/Codex. It records tool-call METADATA (path,
+// size, time, coarse kind) and never allow/denies. The single overriding
+// requirement is fail-open: no matter what the input is or what throws while
+// recording, we always emit a safe output and exit 0 so the editor is never
+// blocked. The try/finally makes the safe-output path unconditional and keeps
+// any deny/exit-nonzero path out of the code entirely.
+function runObserveHook(client) {
+  // Cursor: no permission field == no decision (fall through; fail-open covers
+  // the rest). Codex PostToolUse: the documented success shape.
+  const safeOutput = client === "codex" ? '{"continue":true}' : "{}";
+  try {
+    const input = readJsonFromStdin();
+    const event = extractObserveEvent(client, input);
+    if (event) {
+      const cwd = resolveObserveCwd(client, input);
+      if (cwd) {
+        recordSessionEvent(cwd, { type: "observe", client, ...event });
+      }
+    }
+  } catch {
+    // Swallow everything — an observation hook must never disrupt the editor.
+  } finally {
+    process.stdout.write(safeOutput);
+  }
+}
+
+// Resolve the project root from the hook payload (Cursor: workspace_roots[0];
+// Codex: cwd), falling back to process.cwd(). Deliberately lightweight — this
+// hook fires on every file read, so it does a directory check only and skips
+// the git validation validateCwd would spawn. Returns null if unresolvable.
+function resolveObserveCwd(client, input) {
+  let candidate = process.cwd();
+  const roots = input && input.workspace_roots;
+  if (client === "cursor" && Array.isArray(roots) && typeof roots[0] === "string" && roots[0]) {
+    candidate = roots[0];
+  } else if (input && typeof input.cwd === "string" && input.cwd) {
+    candidate = input.cwd;
+  }
+  try {
+    const resolved = realpathSync(candidate);
+    if (statSync(resolved).isDirectory()) {
+      return resolved;
+    }
+  } catch {
+    // unresolvable — skip recording, still emit safe output
+  }
+  return null;
 }
 
 function runReport(values) {
@@ -425,11 +489,13 @@ Usage:
   token-ops install claude-hook
   token-ops install cursor
   token-ops install codex
+  token-ops install observe
   token-ops uninstall
   token-ops uninstall claude
   token-ops uninstall claude-hook
   token-ops uninstall cursor
   token-ops uninstall codex
+  token-ops uninstall observe
   token-ops hook claude-user-prompt-submit
 
 Options:

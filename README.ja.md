@@ -107,6 +107,18 @@ token-ops install
 
 `claude-hook`に`--trigger-mode smart`を付けると、コーディング系キーワードを含むプロンプトのみで発火します(デフォルトは6文字以上のどのプロンプトでも発火)。
 
+### Cursor / Codex の遵守率を計測する(任意・opt-in)
+
+Claude Code の遵守率は `token-ops audit` がトランスクリプトから実測します。Cursor と Codex はトランスクリプトを持たないため、計測には**観測専用フック**が必要です。デフォルトのインストールには**含まれません**。明示的に有効化してください:
+
+```sh
+token-ops install observe
+```
+
+`.cursor/hooks.json` と `.codex/hooks.json` に fail-open のフックを書き込みます。これは**ツール呼び出しのメタデータ(パス・サイズ・時刻)だけを** `.token-ops/session.jsonl` に記録します。**allow/deny は一切行わず**、**ファイル内容やコマンド本文は保存しません**。解除は `token-ops uninstall observe`。その後 `token-ops audit` を実行すると Cursor/Codex の `Cn`/`Ct` を確認できます。
+
+> **カバレッジは設計上ベストエフォートです。** Codex は `unified_exec` 経由のシェル呼び出しを捕捉しないため、その分は取りこぼします。Cursor の「before」フックは結果を持たないため、シェル/MCP は件数のみ計上され、トークンサイズは分かりません。万一フックのプロセスがクラッシュしても fail-open(エディタは決してブロックされない)で、次の呼び出しが自己回復します。取りこぼすのはその1件の計測だけです。
+
 ### グローバルインストール(任意)
 
 `--global`を付けるとホーム配下(`~/.claude/`、`~/.cursor/`)にインストールされ、全プロジェクトでToken Opsが発火します。プロジェクトごとのインストールが不要になります。
@@ -186,13 +198,15 @@ node /path/to/token-ops/docs/session-stats.mjs
 
 このスクリプトは依存ゼロのNode 18+で動きます。既知のテストフィクスチャプロンプト(`npm test`実行時のもの)を除外しているので、開発中のテスト実行が集計値を汚染しません。書き込みは行わず、読み取り専用です。
 
-### エージェントが実際に読んだ量を測る(Claude Code)
+### エージェントが実際に読んだ量を測る(Claude Code・Cursor・Codex)
 
 ```sh
 token-ops audit
 ```
 
 現在のプロジェクトのClaude Codeトランスクリプト(ローカル)を解析し、組み込みRead/Grep/bash経由で取得したトークン量、Token Ops MCPツールの使用回数、スニペット化で削れたはずの上限を表示します。読み取り専用・このプロジェクト限定で、集計は件数とサイズのみ。プロンプト本文やファイル内容はレポートに含まれません。
+
+[観測フック](#cursor--codex-の遵守率を計測する任意opt-in)(`token-ops install observe`)を有効化していれば、`audit` は観測ログから Cursor/Codex のクライアント別 `Cn`/`Ct` セクションも表示します。こちらのカバレッジはベストエフォートです(Codex は `unified_exec` 経由のシェルを取りこぼします)。
 
 ## リファレンス
 

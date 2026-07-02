@@ -15,10 +15,10 @@ const GITIGNORE_ENTRIES = [
 const GITIGNORE_LEGACY_HEADER = "# Token Ops session log";
 
 export function installIntegration({ cwd, target, cliPath, nodePath, triggerMode = "all", global = false }) {
-  const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex"]);
+  const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex", "observe"]);
 
   if (!validTargets.has(target)) {
-    throw new Error("install target must be one of: all, claude, claude-hook, cursor, codex");
+    throw new Error("install target must be one of: all, claude, claude-hook, cursor, codex, observe");
   }
 
   if (global && target === "codex") {
@@ -65,10 +65,33 @@ export function installIntegration({ cwd, target, cliPath, nodePath, triggerMode
     installed.push("AGENTS.md");
   }
 
+  // Observation-only hooks are opt-in: installed ONLY for the explicit `observe`
+  // target, never under `all`. They record tool-call metadata and never
+  // allow/deny (see runObserveHook in bin/token-ops.js).
+  if (target === "observe") {
+    const cursorHooks = join(root, ".cursor", "hooks.json");
+    mkdirSync(dirname(cursorHooks), { recursive: true });
+    writeFileSync(cursorHooks, renderCursorObserveHooks(cursorHooks, cliPath, nodePath));
+    installed.push(`${displayPrefix}/.cursor/hooks.json`.replace(/^\//, ""));
+
+    const codexHooks = join(root, ".codex", "hooks.json");
+    mkdirSync(dirname(codexHooks), { recursive: true });
+    writeFileSync(codexHooks, renderCodexObserveHooks(codexHooks, cliPath, nodePath));
+    installed.push(`${displayPrefix}/.codex/hooks.json`.replace(/^\//, ""));
+  }
+
   if (!global) {
     const gitignoreResult = ensureGitignoreEntry(join(cwd, ".gitignore"));
     if (gitignoreResult) {
       installed.push(gitignoreResult);
+    }
+    if (target === "observe") {
+      // hooks.json embeds absolute node/cli paths (needed so the editor GUI can
+      // launch the hook); gitignore them so they don't leak into commits.
+      const observeGitignore = ensureObserveGitignore(join(cwd, ".gitignore"));
+      if (observeGitignore) {
+        installed.push(observeGitignore);
+      }
     }
   }
 
@@ -150,10 +173,10 @@ function removeGitignoreEntry(gitignorePath) {
 }
 
 export function uninstallIntegration({ cwd, target, global = false }) {
-  const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex"]);
+  const validTargets = new Set(["all", "claude", "claude-hook", "cursor", "codex", "observe"]);
 
   if (!validTargets.has(target)) {
-    throw new Error("uninstall target must be one of: all, claude, claude-hook, cursor, codex");
+    throw new Error("uninstall target must be one of: all, claude, claude-hook, cursor, codex, observe");
   }
 
   if (global && target === "codex") {
@@ -212,10 +235,32 @@ export function uninstallIntegration({ cwd, target, global = false }) {
     }
   }
 
+  // Cleanup is more forgiving than install: `uninstall` (all) also removes the
+  // opt-in observe hooks if present, so a plain uninstall leaves nothing behind.
+  if (target === "all" || target === "observe") {
+    const cursorResult = stripObserveHooks(join(root, ".cursor", "hooks.json"), "cursor-observe", `${displayPrefix}/.cursor/hooks.json`.replace(/^\//, ""));
+    if (cursorResult) {
+      removed.push(cursorResult);
+      tryRemoveEmptyDir(join(root, ".cursor"));
+    }
+    const codexResult = stripObserveHooks(join(root, ".codex", "hooks.json"), "codex-observe", `${displayPrefix}/.codex/hooks.json`.replace(/^\//, ""));
+    if (codexResult) {
+      removed.push(codexResult);
+      tryRemoveEmptyDir(join(root, ".codex"));
+    }
+  }
+
   if (!global && target === "all") {
     const gitignoreResult = removeGitignoreEntry(join(cwd, ".gitignore"));
     if (gitignoreResult) {
       removed.push(gitignoreResult);
+    }
+  }
+
+  if (!global && (target === "all" || target === "observe")) {
+    const observeGitignore = removeObserveGitignore(join(cwd, ".gitignore"));
+    if (observeGitignore) {
+      removed.push(observeGitignore);
     }
   }
 
@@ -312,6 +357,155 @@ function safeReadJson(path, label) {
   } catch {
     throw new Error(`${path} is not valid JSON (${label})`);
   }
+}
+
+// ---- Observation-only hooks (Cursor / Codex) ----
+
+const CURSOR_OBSERVE_EVENTS = ["beforeReadFile", "beforeShellExecution", "beforeMCPExecution"];
+
+// The command string a Cursor/Codex hook runs. Absolute node + cli paths are
+// baked in so the editor GUI (which does not inherit the shell PATH) can launch
+// it — the same reason the Claude hook stores an absolute node path.
+function observeCommand(cliPath, nodePath, hookName, client) {
+  const node = typeof nodePath === "string" && nodePath.length > 0 ? nodePath : "node";
+  return `${shellQuote(node)} ${shellQuote(cliPath)} hook ${hookName} --client ${client}`;
+}
+
+// True if a hook entry (Cursor's flat {command} or Codex's nested {hooks:[{command}]})
+// is one token-ops installed, identified by the observe hook name in its command.
+function entryReferencesObserve(entry, marker) {
+  if (!entry || typeof entry !== "object") {
+    return false;
+  }
+  if (typeof entry.command === "string" && entry.command.includes(marker)) {
+    return true;
+  }
+  if (Array.isArray(entry.hooks)) {
+    return entry.hooks.some((item) => item && typeof item.command === "string" && item.command.includes(marker));
+  }
+  return false;
+}
+
+export function renderCursorObserveHooks(hooksPath, cliPath, nodePath) {
+  const existing = existsSync(hooksPath) ? safeReadJson(hooksPath, "Cursor hooks.json") : {};
+  existing.version = existing.version || 1;
+  existing.hooks = existing.hooks || {};
+  const command = observeCommand(cliPath, nodePath, "cursor-observe", "cursor");
+
+  for (const event of CURSOR_OBSERVE_EVENTS) {
+    const current = Array.isArray(existing.hooks[event]) ? existing.hooks[event] : [];
+    const withoutOurs = current.filter((entry) => !entryReferencesObserve(entry, "cursor-observe"));
+    existing.hooks[event] = [...withoutOurs, { command, timeout: 5 }];
+  }
+
+  return `${JSON.stringify(existing, null, 2)}\n`;
+}
+
+export function renderCodexObserveHooks(hooksPath, cliPath, nodePath) {
+  const existing = existsSync(hooksPath) ? safeReadJson(hooksPath, "Codex hooks.json") : {};
+  existing.hooks = existing.hooks || {};
+  const command = observeCommand(cliPath, nodePath, "codex-observe", "codex");
+
+  const current = Array.isArray(existing.hooks.PostToolUse) ? existing.hooks.PostToolUse : [];
+  const withoutOurs = current.filter((entry) => !entryReferencesObserve(entry, "codex-observe"));
+  existing.hooks.PostToolUse = [
+    ...withoutOurs,
+    { matcher: "*", hooks: [{ type: "command", command, timeout: 5 }] }
+  ];
+
+  return `${JSON.stringify(existing, null, 2)}\n`;
+}
+
+// Remove only the token-ops observe entries from a Cursor/Codex hooks.json,
+// preserving any hooks the user added. Cleans up emptied events, an emptied
+// hooks object, and finally the file itself (when nothing but our version
+// marker remains). Mirrors stripTokenOpsHook's shape.
+function stripObserveHooks(hooksPath, marker, displayPath) {
+  if (!existsSync(hooksPath)) {
+    return null;
+  }
+  const settings = safeReadJson(hooksPath, displayPath);
+  const hooks = settings.hooks;
+  if (!hooks || typeof hooks !== "object") {
+    return null;
+  }
+
+  let changed = false;
+  for (const event of Object.keys(hooks)) {
+    if (!Array.isArray(hooks[event])) {
+      continue;
+    }
+    const filtered = hooks[event].filter((entry) => !entryReferencesObserve(entry, marker));
+    if (filtered.length !== hooks[event].length) {
+      changed = true;
+      if (filtered.length === 0) {
+        delete hooks[event];
+      } else {
+        hooks[event] = filtered;
+      }
+    }
+  }
+
+  if (!changed) {
+    return null;
+  }
+
+  if (Object.keys(hooks).length === 0) {
+    delete settings.hooks;
+  }
+
+  // If only the `version` marker we added remains, the file was ours — delete it.
+  const remaining = Object.keys(settings).filter((key) => key !== "version");
+  if (remaining.length === 0) {
+    rmSync(hooksPath);
+    return `${displayPath} (deleted)`;
+  }
+
+  writeFileSync(hooksPath, `${JSON.stringify(settings, null, 2)}\n`);
+  return `${displayPath} (token-ops observe hooks removed)`;
+}
+
+// hooks.json entries live in their own gitignore block (separate header) so the
+// existing 3-entry managed block and its legacy-upgrade regex are untouched.
+const OBSERVE_GITIGNORE_HEADER = "# Token Ops observe hooks";
+const OBSERVE_GITIGNORE_ENTRIES = [".cursor/hooks.json", ".codex/hooks.json"];
+
+function ensureObserveGitignore(gitignorePath) {
+  const existing = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
+  const missing = OBSERVE_GITIGNORE_ENTRIES.filter((entry) => !existing.includes(entry));
+  if (missing.length === 0) {
+    return null;
+  }
+  const separator = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
+  const blockPrefix = existing.length > 0 ? "\n" : "";
+  const block = `${OBSERVE_GITIGNORE_HEADER}\n${missing.join("\n")}\n`;
+  writeFileSync(gitignorePath, existing + separator + blockPrefix + block);
+  return existing.length === 0 ? ".gitignore (created)" : `.gitignore (${missing.join(", ")} added)`;
+}
+
+function removeObserveGitignore(gitignorePath) {
+  if (!existsSync(gitignorePath)) {
+    return null;
+  }
+  const current = readFileSync(gitignorePath, "utf8");
+  if (!OBSERVE_GITIGNORE_ENTRIES.some((entry) => current.includes(entry))) {
+    return null;
+  }
+  const stripLines = new Set([...OBSERVE_GITIGNORE_ENTRIES, OBSERVE_GITIGNORE_HEADER]);
+  let cleaned = current
+    .split("\n")
+    .filter((line) => !stripLines.has(line.trim()))
+    .join("\n");
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "");
+  if (!cleaned.endsWith("\n") && cleaned.length > 0) {
+    cleaned += "\n";
+  }
+  if (cleaned.trim().length === 0) {
+    rmSync(gitignorePath);
+    return ".gitignore (deleted)";
+  }
+  writeFileSync(gitignorePath, cleaned);
+  return ".gitignore (Token Ops observe entries removed)";
 }
 
 function stripTokenOpsAgentsBlock(path) {
