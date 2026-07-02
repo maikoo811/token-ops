@@ -223,6 +223,8 @@ Prefer this order:
 2. Use the returned snippets and token budget before reading more files.
 3. Call list_high_cost_files before opening large files, generated files, lockfiles, or logs.
 4. Call report_saved_tokens when the user asks about cost, tokens, usage, or savings.
+
+Always pass cwd as the absolute path to the project root (the directory containing .git) — infer it from recent file paths or the workspace folder. Without cwd the call fails in Cursor.
 ```
 
 そして`~/.cursor/mcp.json`にToken OpsをMCPサーバーとして追加してください(初回のみ):
