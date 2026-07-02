@@ -216,9 +216,8 @@ On the [Cursor Marketplace](https://cursor.com/marketplace). Includes the MCP se
 For Level ★★, paste this into `Cursor Settings → Rules → User Rules`:
 
 ```
-Use Token Ops before broad repository exploration, large file reads, or noisy test-log analysis — it cuts wasted context.
+Use Token Ops before broad repository exploration, large file reads, or noisy test-log analysis — it cuts wasted context. Prefer this order:
 
-Prefer this order:
 1. Call build_compact_context for the current task, including quick one-line checks.
 2. Use the returned snippets and token budget before reading more files.
 3. Call list_high_cost_files before opening large files, generated files, lockfiles, or logs.
