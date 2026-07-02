@@ -54,6 +54,8 @@ test("MCP server responds to initialize via newline-delimited JSON", async () =>
   assert.equal(response.id, 1);
   assert.equal(response.result.serverInfo.name, "token-ops");
   assert.match(response.result.serverInfo.version, /^\d+\.\d+\.\d+$/);
+  // Codex reads this field for server-wide guidance (#92).
+  assert.match(response.result.instructions, /build_compact_context/);
 });
 
 test("MCP server lists tools via newline-delimited JSON", async () => {

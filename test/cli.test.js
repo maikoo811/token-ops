@@ -5,9 +5,19 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { shouldInjectForPrompt } from "../src/core.js";
-import { isNvmManagedNode } from "../src/integrations.js";
+import { isNvmManagedNode, renderCursorRule, renderCodexInstructions } from "../src/integrations.js";
 
 const cli = resolve("bin/token-ops.js");
+
+test("rule text does not claim to replace the built-in Read/Grep tools (#92)", () => {
+  // No such replacement tool exists yet (see issue #90's design doc); claiming
+  // one would mislead the agent into skipping Read when it still needs file
+  // content, and read_smart-style replacement only makes sense once that tool
+  // ships.
+  const forbidden = /instead of (the )?(built-in )?(Read|Grep)\b/i;
+  assert.doesNotMatch(renderCursorRule(), forbidden);
+  assert.doesNotMatch(renderCodexInstructions(), forbidden);
+});
 
 test("prints help", () => {
   const output = execFileSync(process.execPath, [cli, "--help"], { encoding: "utf8" });

@@ -216,15 +216,13 @@ node /path/to/token-ops/docs/session-stats.mjs
 レベル★★の場合、以下を`Cursor Settings → Rules → User Rules`にペーストしてください:
 
 ```
-Before broad repository exploration, large file reads, or noisy test-log analysis, use Token Ops if its MCP tools are available.
+Use Token Ops before broad repository exploration, large file reads, or noisy test-log analysis — it cuts wasted context.
 
 Prefer this order:
-1. Call build_compact_context for the current task.
+1. Call build_compact_context for the current task, including quick one-line checks.
 2. Use the returned snippets and token budget before reading more files.
 3. Call list_high_cost_files before opening large files, generated files, lockfiles, or logs.
 4. Call report_saved_tokens when the user asks about cost, tokens, usage, or savings.
-
-Avoid reading broad repository context until Token Ops output is insufficient for the task.
 ```
 
 そして`~/.cursor/mcp.json`にToken OpsをMCPサーバーとして追加してください(初回のみ):
