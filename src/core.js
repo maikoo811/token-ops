@@ -598,58 +598,128 @@ export function extractKeywords(task) {
   return [...new Set(words)].slice(0, 20);
 }
 
-function rankFiles(files, keywords, changedFiles, cwd) {
-  const bridgedKeywords = bridgeJapaneseKeywords(keywords);
+// BM25 params for the content-relevance component. Structural signals (path,
+// symbol, changed-file) stay as fixed bonuses on top — BM25 only replaces the
+// old flat per-hit content score, so rare distinctive terms outrank common ones
+// and a long file no longer wins just by mentioning a keyword once. (#86)
+const BM25_K1 = 1.2;
+const BM25_B = 0.75;
+const CONTENT_WEIGHT = 4; // scales the BM25 sum into the additive point system
+const BRIDGED_CONTENT_FACTOR = 0.6; // JA→EN bridge is inferred, so weight it below direct hits
 
-  return files
-    .map((file) => {
-      const pathText = file.toLowerCase();
-      let score = changedFiles.has(file) ? 12 : 0;
+// Split text into lowercased subword tokens for BM25: identifiers are broken on
+// camelCase / snake_case / kebab-case (so "importCsv" → import, csv) and CJK Han
+// / Katakana runs are kept. camelCase must split before lowercasing.
+function tokenizeContent(text) {
+  const tokens = [];
+  for (const word of text.match(/[A-Za-z0-9]+/g) || []) {
+    const parts = word.split(/(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/);
+    // Keep the joined identifier too (so a lowercased query keyword like
+    // "loginuser" still matches "loginUser"), plus each camelCase subword.
+    const joined = word.toLowerCase();
+    if (joined.length >= 2) {
+      tokens.push(joined);
+    }
+    if (parts.length > 1) {
+      for (const part of parts) {
+        const token = part.toLowerCase();
+        if (token.length >= 2) {
+          tokens.push(token);
+        }
+      }
+    }
+  }
+  for (const cjk of text.match(/[\p{Script=Han}]{2,}|[\p{Script=Katakana}ー]{2,}/gu) || []) {
+    tokens.push(cjk);
+  }
+  return tokens;
+}
+
+function rankFiles(files, keywords, changedFiles, cwd) {
+  const bridgedKeywords = [...bridgeJapaneseKeywords(keywords)];
+
+  // BM25 query terms are tokenized the same way as content so "csv_id" and
+  // "importCsv" line up on the shared subwords (csv / import / id). Direct
+  // keywords outrank bridged (inferred) ones via BRIDGED_CONTENT_FACTOR.
+  const directTerms = new Set(keywords.flatMap(tokenizeContent));
+  const bridgedTerms = new Set(bridgedKeywords.flatMap(tokenizeContent).filter((term) => !directTerms.has(term)));
+  const queryTerms = [...directTerms, ...bridgedTerms];
+
+  // Pass 1: read each file once; gather content token stats + symbols.
+  const docs = files.map((file) => {
+    const rawContent = readSmallFile(join(cwd, file));
+    const tf = new Map(queryTerms.map((term) => [term, 0]));
+    let len = 0;
+    for (const token of tokenizeContent(rawContent)) {
+      len += 1;
+      if (tf.has(token)) {
+        tf.set(token, tf.get(token) + 1);
+      }
+    }
+    return { file, symbols: extractSymbolNames(file, rawContent), tf, len };
+  });
+
+  // Corpus stats for the query terms only (no full inverted index needed).
+  const docCount = docs.length;
+  const avgdl = docCount > 0 ? docs.reduce((sum, doc) => sum + doc.len, 0) / docCount : 0;
+  const idf = new Map();
+  for (const term of queryTerms) {
+    const df = docs.reduce((count, doc) => count + (doc.tf.get(term) > 0 ? 1 : 0), 0);
+    idf.set(term, Math.log(1 + (docCount - df + 0.5) / (df + 0.5)));
+  }
+
+  const bm25 = (doc, term) => {
+    const freq = doc.tf.get(term) || 0;
+    if (freq === 0 || avgdl === 0) {
+      return 0;
+    }
+    const denom = freq + BM25_K1 * (1 - BM25_B + BM25_B * (doc.len / avgdl));
+    return idf.get(term) * (freq * (BM25_K1 + 1)) / denom;
+  };
+
+  return docs
+    .map((doc) => {
+      const pathText = doc.file.toLowerCase();
+      let score = changedFiles.has(doc.file) ? 12 : 0;
 
       for (const keyword of keywords) {
         if (pathText.includes(keyword)) {
           score += 25;
         }
       }
-
       for (const bridged of bridgedKeywords) {
         if (pathText.includes(bridged)) {
           score += 15;
         }
       }
 
-      const rawContent = readSmallFile(join(cwd, file));
-      const content = rawContent.toLowerCase();
-      for (const keyword of keywords) {
-        if (content.includes(keyword)) {
-          score += 8;
-        }
+      // Content relevance via BM25 (replaces the old flat +8 / +5 per hit).
+      let content = 0;
+      for (const term of directTerms) {
+        content += bm25(doc, term);
       }
-
-      for (const bridged of bridgedKeywords) {
-        if (content.includes(bridged)) {
-          score += 5;
-        }
+      for (const term of bridgedTerms) {
+        content += bm25(doc, term) * BRIDGED_CONTENT_FACTOR;
       }
+      score += Math.round(content * CONTENT_WEIGHT);
 
       // Symbol-defining file outranks one that only mentions the keyword.
-      const symbols = extractSymbolNames(file, rawContent);
       for (const keyword of keywords) {
-        if (symbols.has(keyword)) {
+        if (doc.symbols.has(keyword)) {
           score += 30;
         }
       }
       for (const bridged of bridgedKeywords) {
-        if (symbols.has(bridged)) {
+        if (doc.symbols.has(bridged)) {
           score += 20;
         }
       }
 
-      if (/\b(test|spec)\b/i.test(file)) {
+      if (/\b(test|spec)\b/i.test(doc.file)) {
         score += 4;
       }
 
-      return { file, score };
+      return { file: doc.file, score };
     })
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score || a.file.localeCompare(b.file))
