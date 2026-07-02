@@ -415,6 +415,33 @@ test("symbol ranking: only applies to JS/TS files (no boost for Markdown)", () =
   assert.ok(realPos < docsPos, "real.js should outrank docs.md via symbol boost");
 });
 
+test("BM25 ranking: a short focused file outranks a long diluted one for the same term (#86)", () => {
+  // Both files mention `throttle` exactly once, in content only (not in the
+  // path, not as a defined symbol), so structural bonuses don't apply and the
+  // ordering is decided purely by BM25 length normalization.
+  const longFiller = Array.from({ length: 200 }, (_, i) => `const v${i} = ${i};`).join("\n");
+  const cwd = setupJsRepo({
+    "short.js": "export const limiter = makeLimiter();\nlimiter.throttle();\n",
+    "long.js": `${longFiller}\nhelper.throttle();\n`,
+    // Decoys without the term so `throttle` stays rare across the corpus
+    // (otherwise df == N collapses idf to ~0 and nothing scores).
+    "d1.js": "export const alpha = 1;\n",
+    "d2.js": "export const beta = 2;\n",
+    "d3.js": "export const gamma = 3;\n",
+    "d4.js": "export const delta = 4;\n"
+  });
+
+  const output = execFileSync(process.execPath, [cli, "pack", "fix throttle"], { cwd, encoding: "utf8" });
+
+  const relevantBlock = output.split(/##\s+Relevant Files/i)[1] || "";
+  const shortPos = relevantBlock.indexOf("short.js");
+  const longPos = relevantBlock.indexOf("long.js");
+  assert.notEqual(shortPos, -1, "short.js should be selected");
+  assert.notEqual(longPos, -1, "long.js should be selected");
+  assert.ok(shortPos < longPos,
+    `short.js (pos ${shortPos}) should outrank the diluted long.js (pos ${longPos})`);
+});
+
 test("AST mode: braces inside strings and comments don't break the parser", () => {
   const cwd = setupJsRepo({
     "tricky.js": [
