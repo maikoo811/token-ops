@@ -5,6 +5,11 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.7] — 2026-07-02
+
+### Changed
+- `pack` file ranking now scores file content with BM25 instead of flat per-keyword hits: rare, distinctive terms outrank common ones and long files no longer win just by mentioning a keyword once. Identifiers are tokenized on camelCase/snake/kebab. Structural signals (path, symbol-definition, changed-file, test) are unchanged, and it stays fully local with no API or new dependencies. (#86)
+
 ## [0.6.6] — 2026-06-27
 
 ### Added
