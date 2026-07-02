@@ -159,9 +159,7 @@ function route(method, params) {
         name: "token-ops",
         version: PACKAGE_VERSION
       },
-      // Codex reads this field for server-wide guidance; Claude Code / Cursor
-      // support is unconfirmed, so keep it short and let tool descriptions
-      // carry the per-call detail (#92).
+      // Codex reads this for server-wide guidance; other clients' support is unconfirmed (#92).
       instructions: "Prefer build_compact_context before broad repository exploration to reduce wasted context."
     };
   }
