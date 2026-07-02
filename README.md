@@ -186,6 +186,14 @@ Sample output:
 
 The script is zero-dependency Node 18+. It filters known test-fixture prompts (so `npm test` runs don't pollute your aggregate) and writes nothing — read-only.
 
+### Measure what the agent actually read (Claude Code)
+
+```sh
+token-ops audit
+```
+
+Parses your local Claude Code transcripts for the current project and reports how many tokens the agent fetched through built-in Read/Grep/bash, how often Token Ops MCP tools were used, and an upper bound on what capped snippets could have avoided. Read-only, this project only, and only counts and sizes are aggregated — prompt text and file contents are never included in the report.
+
 ## Reference
 
 ### Levels of Automation
