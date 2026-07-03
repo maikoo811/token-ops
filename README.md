@@ -4,7 +4,7 @@
 
 Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Claude Code, Codex, and other MCP-compatible agents a compact task-focused context pack before they read broadly, then records an estimated saved-token report.
 
-Install once, code normally, see how much the agent avoided reading. No API key, no account, no cloud backend, no telemetry by default.
+Install once, code normally, see how much the agent avoided reading. No API key, no account, no cloud backend, and no telemetry — the tool never makes network calls.
 
 ## How it works
 
