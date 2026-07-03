@@ -19,6 +19,21 @@ test("rule text does not claim to replace the built-in Read/Grep tools (#92)", (
   assert.doesNotMatch(readFileSync(resolve("skills/token-ops/SKILL.md"), "utf8"), REPLACEMENT_CLAIM);
 });
 
+test("Cursor plugin rule file stays in sync with renderCursorRule", () => {
+  // rules/token-ops.mdc ships inside the Cursor plugin. It must match the
+  // renderer exactly — an out-of-sync copy already shipped once without the
+  // cwd guidance, which README documents as required for calls to succeed
+  // in Cursor.
+  const ruleFile = readFileSync(resolve("rules", "token-ops.mdc"), "utf8");
+  assert.equal(ruleFile, renderCursorRule(), "rules/token-ops.mdc drifted from renderCursorRule()");
+});
+
+test("Cursor plugin manifest version stays in sync with package.json", () => {
+  const pkg = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
+  const plugin = JSON.parse(readFileSync(resolve(".cursor-plugin", "plugin.json"), "utf8"));
+  assert.equal(plugin.version, pkg.version, ".cursor-plugin/plugin.json version drifted from package.json");
+});
+
 test("README copy-paste rule blocks stay in sync with renderCursorRule (#93)", () => {
   // This block drifted from the renderer twice before. The paste block is
   // plain text (no .mdc frontmatter, no backticks); compare the rest verbatim.
