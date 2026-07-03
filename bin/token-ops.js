@@ -54,7 +54,7 @@ try {
     process.exit(0);
   }
 
-  if (command === "--version" || command === "-v") {
+  if (command === "--version" || command === "-v" || command === "version") {
     const here = dirname(fileURLToPath(import.meta.url));
     const pkg = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8"));
     console.log(pkg.version);
@@ -479,6 +479,7 @@ function printHelp() {
 
 Usage:
   token-ops pack "Fix the CSV import bug"
+  token-ops version
   token-ops report
   token-ops handoff
   token-ops audit

@@ -54,7 +54,7 @@ test("prints help", () => {
 
 test("prints version", () => {
   const expected = JSON.parse(readFileSync(resolve("package.json"), "utf8")).version;
-  for (const flag of ["--version", "-v"]) {
+  for (const flag of ["--version", "-v", "version"]) {
     const output = execFileSync(process.execPath, [cli, flag], { encoding: "utf8" });
     assert.equal(output.trim(), expected, `${flag} should print the package.json version`);
   }
