@@ -743,12 +743,16 @@ test("uninstall on a clean directory is a no-op with a helpful message", () => {
 test("claude prompt hook falls back gracefully when input.cwd is invalid", () => {
   // A non-existent cwd in the hook payload — the hook should not crash;
   // it should silently fall back to process.cwd() (this test's cwd, which
-  // IS a git repo: the token-ops repo itself).
+  // IS a git repo: the token-ops repo itself). Logging is disabled because
+  // the fallback cwd is the real repo — without it, every `npm test` run
+  // would append fixture rows to the developer's own .token-ops/session.jsonl
+  // and inflate `token-ops report`.
   const output = execFileSync(
     process.execPath,
     [cli, "hook", "claude-user-prompt-submit"],
     {
       encoding: "utf8",
+      env: { ...process.env, TOKEN_OPS_DISABLE_LOG: "1" },
       input: JSON.stringify({
         cwd: "/this/path/definitely/does/not/exist",
         prompt: "fix the bug in extractKeywords"
@@ -767,11 +771,14 @@ test("claude prompt hook falls back gracefully when input.cwd is not a git repo"
   const nonGitDir = mkdtempSync(join(tmpdir(), "token-ops-hook-nogit-"));
   writeFileSync(join(nonGitDir, "README.md"), "# just a directory, not a git repo\n");
 
+  // TOKEN_OPS_DISABLE_LOG: same reason as the invalid-cwd test above — the
+  // hook falls back to this repo and would otherwise log fixture rows into it.
   const output = execFileSync(
     process.execPath,
     [cli, "hook", "claude-user-prompt-submit"],
     {
       encoding: "utf8",
+      env: { ...process.env, TOKEN_OPS_DISABLE_LOG: "1" },
       input: JSON.stringify({
         cwd: nonGitDir,
         prompt: "fix the bug in extractKeywords"
