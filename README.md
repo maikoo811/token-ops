@@ -4,7 +4,7 @@
 
 Token Ops reduces wasted context during AI coding sessions. It gives Cursor, Claude Code, Codex, and other MCP-compatible agents a compact task-focused context pack before they read broadly, then records an estimated saved-token report.
 
-Install once, code normally, see how much the agent avoided reading. No API key, no account, no cloud backend, no telemetry by default.
+Install once, code normally, see how much the agent avoided reading. No API key, no account, no cloud backend, and no telemetry — the tool never makes network calls.
 
 ## How it works
 
@@ -76,6 +76,7 @@ A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pa
 - **Upper bound, not guaranteed savings.** The AI might still read more files after the pack arrives. Real savings will be at most the figures above, often less.
 - **Rough estimates.** Token counts are approximated from character length. Per-prompt-type figures come from a small sample — trust the aggregate more than the breakdown.
 - **Quality is preserved.** Token Ops only *adds* context to the conversation. The AI keeps all its tools, so it can read more files when the pack doesn't cover everything.
+- **The hook itself costs tokens.** In the default `all` mode, `claude-hook` adds a pack (typically a few thousand tokens) to every prompt. That cost is paid every time; the savings only materialize when the pack keeps the agent from reading files in full. If most of your prompts are short or conversational, install with `--trigger-mode smart` so the hook fires only on coding prompts.
 
 ## Quick Start
 
@@ -106,6 +107,18 @@ Default installs hooks/rules for Claude Code, Cursor, and Codex. To install only
 - `token-ops install codex` — Codex `AGENTS.md`
 
 Add `--trigger-mode smart` to `claude-hook` to fire only when the prompt contains a coding keyword (default fires on any prompt ≥ 6 chars).
+
+### Measure compliance on Cursor / Codex (optional, opt-in)
+
+Claude Code compliance is measured from transcripts by `token-ops audit`. Cursor and Codex have no transcripts, so measuring them needs an **observation-only hook**. It is **not** part of the default install — enable it explicitly:
+
+```sh
+token-ops install observe
+```
+
+This writes fail-open hooks to `.cursor/hooks.json` and `.codex/hooks.json` that **only record tool-call metadata** (path, size, time) to `.token-ops/session.jsonl`. It **never allow/denies** anything, and **file contents and command text are never stored**. Remove with `token-ops uninstall observe`. Then run `token-ops audit` to see the measured Cursor/Codex `Cn`/`Ct`.
+
+> **Coverage is best-effort, by design.** Codex does not intercept shell calls made through `unified_exec`, so those are missed. Cursor "before" hooks fire without a result, so shell/MCP calls contribute counts but not token sizes. If the hook process ever crashes it fails open (the editor is never blocked) and the next call self-heals — you may just lose that one measurement.
 
 ### Install globally (optional)
 
@@ -186,13 +199,15 @@ Sample output:
 
 The script is zero-dependency Node 18+. It filters known test-fixture prompts (so `npm test` runs don't pollute your aggregate) and writes nothing — read-only.
 
-### Measure what the agent actually read (Claude Code)
+### Measure what the agent actually read (Claude Code, Cursor, Codex)
 
 ```sh
 token-ops audit
 ```
 
 Parses your local Claude Code transcripts for the current project and reports how many tokens the agent fetched through built-in Read/Grep/bash, how often Token Ops MCP tools were used, and an upper bound on what capped snippets could have avoided. Read-only, this project only, and only counts and sizes are aggregated — prompt text and file contents are never included in the report.
+
+If you enabled the [observation hook](#measure-compliance-on-cursor--codex-optional-opt-in) (`token-ops install observe`), `audit` also prints a per-client `Cn`/`Ct` section for Cursor and Codex, measured from the observe log. Coverage there is best-effort (Codex misses `unified_exec` shell calls).
 
 ## Reference
 

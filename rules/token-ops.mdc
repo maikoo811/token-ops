@@ -1,12 +1,13 @@
 ---
-description: Use Token Ops to reduce wasted Cursor context.
+description: Reduce wasted context with Token Ops before broad exploration.
 alwaysApply: true
 ---
 
-Use Token Ops before broad repository exploration.
+Use Token Ops before broad repository exploration, large file reads, or noisy test-log analysis — it cuts wasted context. Prefer this order:
 
-Call `build_compact_context` for implementation, debugging, review, or test tasks before reading many files. Use its snippets first, then inspect only the smallest extra files needed.
+1. Call `build_compact_context` for the current task.
+2. Use the returned snippets and token budget before reading more files.
+3. Call `list_high_cost_files` before opening large files, generated files, lockfiles, or logs.
+4. Call `report_saved_tokens` when the user asks about cost, tokens, usage, or savings.
 
-Call `list_high_cost_files` before opening large files, generated files, lockfiles, or long logs.
-
-Call `report_saved_tokens` when the user asks about tokens, cost, usage, or savings.
+Always pass `cwd` as the absolute path to the project root (the directory containing `.git`) — infer it from recent file paths or the workspace folder. Without `cwd` the call fails in Cursor.

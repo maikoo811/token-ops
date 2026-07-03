@@ -19,6 +19,21 @@ test("rule text does not claim to replace the built-in Read/Grep tools (#92)", (
   assert.doesNotMatch(readFileSync(resolve("skills/token-ops/SKILL.md"), "utf8"), REPLACEMENT_CLAIM);
 });
 
+test("Cursor plugin rule file stays in sync with renderCursorRule", () => {
+  // rules/token-ops.mdc ships inside the Cursor plugin. It must match the
+  // renderer exactly — an out-of-sync copy already shipped once without the
+  // cwd guidance, which README documents as required for calls to succeed
+  // in Cursor.
+  const ruleFile = readFileSync(resolve("rules", "token-ops.mdc"), "utf8");
+  assert.equal(ruleFile, renderCursorRule(), "rules/token-ops.mdc drifted from renderCursorRule()");
+});
+
+test("Cursor plugin manifest version stays in sync with package.json", () => {
+  const pkg = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
+  const plugin = JSON.parse(readFileSync(resolve(".cursor-plugin", "plugin.json"), "utf8"));
+  assert.equal(plugin.version, pkg.version, ".cursor-plugin/plugin.json version drifted from package.json");
+});
+
 test("README copy-paste rule blocks stay in sync with renderCursorRule (#93)", () => {
   // This block drifted from the renderer twice before. The paste block is
   // plain text (no .mdc frontmatter, no backticks); compare the rest verbatim.
@@ -39,7 +54,7 @@ test("prints help", () => {
 
 test("prints version", () => {
   const expected = JSON.parse(readFileSync(resolve("package.json"), "utf8")).version;
-  for (const flag of ["--version", "-v"]) {
+  for (const flag of ["--version", "-v", "version"]) {
     const output = execFileSync(process.execPath, [cli, flag], { encoding: "utf8" });
     assert.equal(output.trim(), expected, `${flag} should print the package.json version`);
   }
@@ -743,12 +758,16 @@ test("uninstall on a clean directory is a no-op with a helpful message", () => {
 test("claude prompt hook falls back gracefully when input.cwd is invalid", () => {
   // A non-existent cwd in the hook payload — the hook should not crash;
   // it should silently fall back to process.cwd() (this test's cwd, which
-  // IS a git repo: the token-ops repo itself).
+  // IS a git repo: the token-ops repo itself). Logging is disabled because
+  // the fallback cwd is the real repo — without it, every `npm test` run
+  // would append fixture rows to the developer's own .token-ops/session.jsonl
+  // and inflate `token-ops report`.
   const output = execFileSync(
     process.execPath,
     [cli, "hook", "claude-user-prompt-submit"],
     {
       encoding: "utf8",
+      env: { ...process.env, TOKEN_OPS_DISABLE_LOG: "1" },
       input: JSON.stringify({
         cwd: "/this/path/definitely/does/not/exist",
         prompt: "fix the bug in extractKeywords"
@@ -767,11 +786,14 @@ test("claude prompt hook falls back gracefully when input.cwd is not a git repo"
   const nonGitDir = mkdtempSync(join(tmpdir(), "token-ops-hook-nogit-"));
   writeFileSync(join(nonGitDir, "README.md"), "# just a directory, not a git repo\n");
 
+  // TOKEN_OPS_DISABLE_LOG: same reason as the invalid-cwd test above — the
+  // hook falls back to this repo and would otherwise log fixture rows into it.
   const output = execFileSync(
     process.execPath,
     [cli, "hook", "claude-user-prompt-submit"],
     {
       encoding: "utf8",
+      env: { ...process.env, TOKEN_OPS_DISABLE_LOG: "1" },
       input: JSON.stringify({
         cwd: nonGitDir,
         prompt: "fix the bug in extractKeywords"

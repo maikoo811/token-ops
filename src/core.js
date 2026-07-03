@@ -257,27 +257,20 @@ function trimSessionLog(cwd, path) {
   }
 }
 
-export function readSavingsReport(cwd) {
+// Safely read and parse every JSON row from .token-ops/session.jsonl. Returns
+// [] when the log is absent, or when the symlink guard rejects it (a tracked /
+// pre-planted symlink escaping cwd would otherwise let a reader exfiltrate
+// arbitrary host files). Shared by readSavingsReport and the audit observe
+// aggregation so both go through the same guard.
+export function readSessionRows(cwd) {
   const path = join(cwd, ".token-ops", "session.jsonl");
-  const zeroReport = {
-    events: 0,
-    savedTokens: 0,
-    packTokens: 0,
-    selectedFullTokens: 0,
-    repoSavedTokens: 0,
-    path
-  };
   if (!existsSync(path)) {
-    return zeroReport;
+    return [];
   }
-  // Symlink guard: refuse to read session.jsonl if it resolves outside cwd.
-  // This catches a tracked / pre-planted symlink that would otherwise let
-  // `token-ops report` exfiltrate arbitrary host files.
   if (safeAbsPath(cwd, join(".token-ops", "session.jsonl")) === null) {
-    return zeroReport;
+    return [];
   }
-
-  const rows = readFileSync(path, "utf8")
+  return readFileSync(path, "utf8")
     .split("\n")
     .filter(Boolean)
     .map((line) => {
@@ -288,6 +281,22 @@ export function readSavingsReport(cwd) {
       }
     })
     .filter(Boolean);
+}
+
+export function readSavingsReport(cwd) {
+  const path = join(cwd, ".token-ops", "session.jsonl");
+  const zeroReport = {
+    events: 0,
+    savedTokens: 0,
+    packTokens: 0,
+    selectedFullTokens: 0,
+    repoSavedTokens: 0,
+    path
+  };
+
+  // Only pack/hook rows carry a savings budget. Observe rows (type "observe")
+  // share the same log but must not inflate the Runs count or savings totals.
+  const rows = readSessionRows(cwd).filter((row) => row.type === "pack" || row.type === "hook");
 
   return rows.reduce((report, row) => {
     const budget = row.budget || {};
@@ -299,14 +308,7 @@ export function readSavingsReport(cwd) {
       selectedFullTokens: report.selectedFullTokens + Number(budget.selectedFullTokens || 0),
       repoSavedTokens: report.repoSavedTokens + Number(budget.repoSavedTokens || 0)
     };
-  }, {
-    events: 0,
-    savedTokens: 0,
-    packTokens: 0,
-    selectedFullTokens: 0,
-    repoSavedTokens: 0,
-    path
-  });
+  }, zeroReport);
 }
 
 const TERMINAL_DROP_SECTIONS = [
