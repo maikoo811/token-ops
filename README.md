@@ -76,6 +76,7 @@ A raw verbatim pack output is checked in at [docs/sample-pack.md](docs/sample-pa
 - **Upper bound, not guaranteed savings.** The AI might still read more files after the pack arrives. Real savings will be at most the figures above, often less.
 - **Rough estimates.** Token counts are approximated from character length. Per-prompt-type figures come from a small sample — trust the aggregate more than the breakdown.
 - **Quality is preserved.** Token Ops only *adds* context to the conversation. The AI keeps all its tools, so it can read more files when the pack doesn't cover everything.
+- **The hook itself costs tokens.** In the default `all` mode, `claude-hook` adds a pack (typically a few thousand tokens) to every prompt. That cost is paid every time; the savings only materialize when the pack keeps the agent from reading files in full. If most of your prompts are short or conversational, install with `--trigger-mode smart` so the hook fires only on coding prompts.
 
 ## Quick Start
 
