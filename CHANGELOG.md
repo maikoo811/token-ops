@@ -5,10 +5,14 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.9] — 2026-07-03
 
 ### Added
 - `token-ops install observe` (opt-in, not part of the default install) writes fail-open observation-only hooks to `.cursor/hooks.json` and `.codex/hooks.json`. They record tool-call metadata (path, size, time, coarse kind) to `.token-ops/session.jsonl` and never allow/deny — file contents and command text are never stored. `token-ops audit` gains per-client `Cn`/`Ct` sections for Cursor and Codex measured from that log, extending #90's compliance measurement to editors that have no transcripts. Coverage is best-effort and says so: Codex misses `unified_exec` shell calls, and Cursor "before" hooks contribute call counts but not result-token sizes. Remove with `token-ops uninstall observe`. (#91)
+- `token-ops version` is accepted as a subcommand alias of `--version`/`-v`.
+
+### Fixed
+- The Cursor plugin's bundled rule (`rules/token-ops.mdc`) is regenerated from `renderCursorRule()` — it had drifted and was missing the `cwd` guidance required for MCP calls to succeed in Cursor. The plugin manifest version is synced with `package.json`. Both are now pinned by tests so future releases fail CI if either surface drifts.
 
 ## [0.6.8] — 2026-07-03
 
