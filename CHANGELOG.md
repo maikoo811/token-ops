@@ -5,6 +5,15 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- The Claude Code hook now delivers a compact pack (snippets first, then the file list and budget) instead of the full pack, and never echoes the user's prompt back. Claude Code offloads hook output above 10,000 characters to a file the model only sees a ~2KB preview of; measured on a real project, 82% of hook deliveries (216/264) were offloaded this way and the snippets never reached the model, with re-reads of already-packed files at 32% and 2.0 Reads per firing as the pre-fix baseline.
+- A character guard measures the assembled hook context before emitting: snippets are dropped lowest-ranked-first to fit a 7,000-character target, with a 9,500-character hard backstop (the documented offload limit is 10,000 characters). Degraded firings record what was dropped in `.token-ops/session.jsonl`.
+
+### Added
+- `token-ops audit` reports hook-path effectiveness — reads per firing and the covered-read rate (Reads of files whose excerpt the preceding pack already delivered). `Cn`/`Ct` only count MCP calls and cannot see the hook route; these two measured figures can.
+
 ## [0.6.9] — 2026-07-03
 
 ### Added
