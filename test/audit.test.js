@@ -8,6 +8,7 @@ import {
   AUDIT_SNIPPET_LINE_CAP,
   auditTranscriptFile,
   classifyBashCommand,
+  computeHookDelivery,
   renderAuditReport,
   resolveTranscriptDir,
   runAudit
@@ -104,7 +105,8 @@ async function runAuditDir(dir) {
     unparseableLines: 0,
     reads: { builtinCalls: 0, bashViewCalls: 0, tokens: 0, cappedTokens: 0 },
     searches: { grepCalls: 0, globCalls: 0, bashSearchCalls: 0, tokens: 0 },
-    mcp: { calls: 0, tokens: 0, byTool: {} }
+    mcp: { calls: 0, tokens: 0, byTool: {} },
+    readEvents: []
   };
   await auditTranscriptFile(join(dir, "session.jsonl"), stats);
   return { stats };
@@ -155,4 +157,77 @@ test("token-ops audit reports missing transcripts without crashing", () => {
   });
 
   assert.match(output, /No Claude Code transcripts found/);
+});
+
+// ---- computeHookDelivery (hook-path effectiveness) ----
+
+test("computeHookDelivery attributes reads to the latest preceding firing", () => {
+  const sessionRows = [
+    { type: "hook", timestamp: "2026-01-01T00:00:00.000Z", files: ["a.js", "b.js"] },
+    { type: "hook", timestamp: "2026-01-01T01:00:00.000Z", files: ["c.js"] },
+    // Non-hook rows never count as firings.
+    { type: "pack", timestamp: "2026-01-01T00:30:00.000Z", files: ["z.js"] }
+  ];
+  const readEvents = [
+    // Before the first firing — not attributable, excluded from the totals.
+    { timestamp: "2025-12-31T23:00:00.000Z", filePath: "/repo/a.js" },
+    // Covered: a.js was in the first pack.
+    { timestamp: "2026-01-01T00:10:00.000Z", filePath: "/repo/a.js" },
+    // Not covered: x.js was never packed.
+    { timestamp: "2026-01-01T00:20:00.000Z", filePath: "/repo/x.js" },
+    // Not covered: the latest firing's pack is [c.js], not [a.js].
+    { timestamp: "2026-01-01T01:10:00.000Z", filePath: "/repo/a.js" },
+    // Covered by the second pack.
+    { timestamp: "2026-01-01T01:20:00.000Z", filePath: "/repo/c.js" }
+  ];
+
+  const out = computeHookDelivery(sessionRows, readEvents, "/repo");
+  assert.equal(out.firings, 2);
+  assert.equal(out.reads, 4, "the pre-firing read must be excluded");
+  assert.equal(out.coveredReads, 2);
+  assert.equal(out.readsPerFiring, 2);
+  assert.equal(out.coveredReadRate, 50);
+});
+
+test("computeHookDelivery returns zeros without firings", () => {
+  const out = computeHookDelivery([], [{ timestamp: "2026-01-01T00:00:00.000Z", filePath: "/repo/a.js" }], "/repo");
+  assert.deepEqual(out, { firings: 0, reads: 0, coveredReads: 0, readsPerFiring: 0, coveredReadRate: 0 });
+});
+
+test("audit report includes the hook delivery section only when firings exist", () => {
+  // realpathSync: the CLI munges the resolved cwd, and computeHookDelivery
+  // strips the resolved prefix from Read paths.
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "token-ops-audit-hook-")));
+  const fakeHome = mkdtempSync(join(tmpdir(), "token-ops-audit-hook-home-"));
+  const transcriptDir = resolveTranscriptDir(cwd, fakeHome);
+  mkdirSync(transcriptDir, { recursive: true });
+
+  mkdirSync(join(cwd, ".token-ops"));
+  writeFileSync(
+    join(cwd, ".token-ops", "session.jsonl"),
+    `${JSON.stringify({ timestamp: "2026-01-01T00:00:00.000Z", type: "hook", files: ["a.js"] })}\n`
+  );
+
+  const lines = [
+    JSON.stringify({
+      type: "assistant",
+      timestamp: "2026-01-01T00:01:00.000Z",
+      message: { content: [{ type: "tool_use", id: "r1", name: "Read", input: { file_path: join(cwd, "a.js") } }] }
+    }),
+    JSON.stringify({
+      type: "user",
+      message: { content: [{ type: "tool_result", tool_use_id: "r1", content: "covered read" }] }
+    })
+  ];
+  writeFileSync(join(transcriptDir, "session.jsonl"), `${lines.join("\n")}\n`);
+
+  const output = execFileSync(process.execPath, [cli, "audit"], {
+    cwd,
+    encoding: "utf8",
+    env: { ...process.env, HOME: fakeHome }
+  });
+
+  assert.match(output, /Hook delivery effectiveness/);
+  assert.match(output, /Firings: 1 \/ Reads after a firing: 1 \(1 per firing\)/);
+  assert.match(output, /Covered-read rate: 100%/);
 });

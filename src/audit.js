@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, readdirSync } from "node:fs";
+import { createReadStream, existsSync, readdirSync, realpathSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { homedir } from "node:os";
 import { join, sep } from "node:path";
@@ -186,7 +186,10 @@ function emptyStats() {
     unparseableLines: 0,
     reads: { builtinCalls: 0, bashViewCalls: 0, tokens: 0, cappedTokens: 0 },
     searches: { grepCalls: 0, globCalls: 0, bashSearchCalls: 0, tokens: 0 },
-    mcp: { calls: 0, tokens: 0, byTool: {} }
+    mcp: { calls: 0, tokens: 0, byTool: {} },
+    // Read tool_use events ({ timestamp, filePath }) for the hook-delivery
+    // metrics — paths only, file contents are never kept.
+    readEvents: []
   };
 }
 
@@ -248,6 +251,9 @@ export function auditTranscriptFile(path, stats) {
           if (block.name === "Read") {
             stats.reads.builtinCalls += 1;
             pending.set(block.id, "read");
+            if (typeof row.timestamp === "string" && block.input && typeof block.input.file_path === "string") {
+              stats.readEvents.push({ timestamp: row.timestamp, filePath: block.input.file_path });
+            }
           } else if (block.name === "Grep") {
             stats.searches.grepCalls += 1;
             pending.set(block.id, "search");
@@ -307,26 +313,115 @@ export function auditTranscriptFile(path, stats) {
   });
 }
 
+// Hook-path effectiveness: Cn/Ct only count MCP calls, so they cannot see the
+// hook route (an injected pack never registers as a tool call). These metrics
+// measure what the hook is supposed to change instead — whether Reads happen
+// at all, and whether they re-fetch files whose excerpts the preceding pack
+// already delivered. Reads before the first firing are not attributable to
+// any pack and are excluded. Covers the Read tool only; bash viewing has no
+// reliable single file path.
+export function computeHookDelivery(sessionRows, readEvents, cwd) {
+  const firings = (sessionRows || [])
+    .filter((row) => row && row.type === "hook" && typeof row.timestamp === "string" && Array.isArray(row.files))
+    .sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1));
+
+  const result = { firings: firings.length, reads: 0, coveredReads: 0, readsPerFiring: 0, coveredReadRate: 0 };
+  if (firings.length === 0) {
+    return result;
+  }
+
+  // Reads record the absolute path Claude used; firings record repo-relative
+  // paths. Strip both the given cwd and its resolved form (macOS /var vs
+  // /private/var).
+  const prefixes = new Set([`${cwd}/`]);
+  try {
+    prefixes.add(`${realpathSync(cwd)}/`);
+  } catch {
+    // cwd itself came from process.cwd(), so resolution failure just means
+    // no second prefix to strip.
+  }
+
+  for (const read of readEvents || []) {
+    if (!read || typeof read.timestamp !== "string" || typeof read.filePath !== "string") {
+      continue;
+    }
+    let latest = null;
+    for (const firing of firings) {
+      if (firing.timestamp <= read.timestamp) {
+        latest = firing;
+      } else {
+        break;
+      }
+    }
+    if (!latest) {
+      continue;
+    }
+    result.reads += 1;
+    let relative = read.filePath;
+    for (const prefix of prefixes) {
+      if (relative.startsWith(prefix)) {
+        relative = relative.slice(prefix.length);
+        break;
+      }
+    }
+    if (latest.files.includes(relative)) {
+      result.coveredReads += 1;
+    }
+  }
+
+  result.readsPerFiring = Math.round((result.reads / firings.length) * 100) / 100;
+  result.coveredReadRate = result.reads > 0 ? Math.round((result.coveredReads / result.reads) * 100) : 0;
+  return result;
+}
+
 export async function runAudit(cwd, home = homedir()) {
   const dir = resolveTranscriptDir(cwd, home);
   const stats = emptyStats();
+  const sessionRows = readSessionRows(cwd);
   // Cursor/Codex have no transcripts; their compliance comes from observe-hook
   // rows in this project's .token-ops/session.jsonl (read through the symlink guard).
-  const observe = aggregateObserveStats(readSessionRows(cwd));
+  const observe = aggregateObserveStats(sessionRows);
   if (!existsSync(dir)) {
-    return { stats, dir, found: false, observe };
+    return { stats, dir, found: false, observe, hookDelivery: computeHookDelivery(sessionRows, [], cwd) };
   }
   const files = readdirSync(dir).filter((name) => name.endsWith(".jsonl"));
   for (const name of files) {
     await auditTranscriptFile(join(dir, name), stats);
   }
-  return { stats, dir, found: true, observe };
+  const hookDelivery = computeHookDelivery(sessionRows, stats.readEvents, cwd);
+  return { stats, dir, found: true, observe, hookDelivery };
 }
 
-export function renderAuditReport({ stats, dir, found, observe = {} }, lang = "en") {
+export function renderAuditReport({ stats, dir, found, observe = {}, hookDelivery }, lang = "en") {
   const claude = renderClaudeAuditSection({ stats, dir, found }, lang);
+  const hookSection = renderHookDeliverySection(hookDelivery, lang);
   const observeSections = renderObserveSections(observe, lang);
-  return [claude, ...observeSections].join("\n\n");
+  return [claude, ...hookSection, ...observeSections].join("\n\n");
+}
+
+// Rendered only when hook firings exist — a project without the Claude hook
+// installed sees the same report as before. All figures are measured counts;
+// the covered-read rate tells how often the agent re-fetched a file whose
+// excerpt the preceding pack had already delivered.
+function renderHookDeliverySection(hookDelivery, lang) {
+  if (!hookDelivery || hookDelivery.firings === 0) {
+    return [];
+  }
+  const d = hookDelivery;
+  if (lang === "ja") {
+    return [[
+      "## フック配送の実効(実測)",
+      `- 発火: ${formatNumber(d.firings)}回 / 発火後のRead: ${formatNumber(d.reads)}回(${d.readsPerFiring}回/発火)`,
+      `- 収載ファイル再読率: ${d.coveredReadRate}%(直前パックに抜粋を収載済みのファイルへのRead ${formatNumber(d.coveredReads)}回)`,
+      "- 注: Cn/CtはMCP呼び出しのみを数えるため、フック経路の実効はこの2指標で見る"
+    ].join("\n")];
+  }
+  return [[
+    "## Hook delivery effectiveness (measured)",
+    `- Firings: ${formatNumber(d.firings)} / Reads after a firing: ${formatNumber(d.reads)} (${d.readsPerFiring} per firing)`,
+    `- Covered-read rate: ${d.coveredReadRate}% (${formatNumber(d.coveredReads)} Reads of files whose excerpt the preceding pack already delivered)`,
+    "- Note: Cn/Ct only count MCP calls; these two figures are the ones that reflect the hook route"
+  ].join("\n")];
 }
 
 function renderClaudeAuditSection({ stats, dir, found }, lang = "en") {
