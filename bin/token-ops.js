@@ -295,7 +295,8 @@ function runHook(values) {
     cwd: hookCwd,
     maxFiles: 5,
     maxLines: 50,
-    lang
+    lang,
+    format: "hook-compact"
   });
   recordSessionEvent(hookCwd, {
     type: "hook",

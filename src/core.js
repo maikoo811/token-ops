@@ -148,7 +148,7 @@ const TEXT_EXTENSIONS = new Set([
   ".yml"
 ]);
 
-export function generatePack({ task, cwd, maxFiles = DEFAULT_MAX_FILES, maxLines = DEFAULT_MAX_LINES, lang = "en" }) {
+export function generatePack({ task, cwd, maxFiles = DEFAULT_MAX_FILES, maxLines = DEFAULT_MAX_LINES, lang = "en", format = "full" }) {
   const files = listVisibleFiles(cwd);
   const git = readGitState(cwd);
   const keywords = extractKeywords(task);
@@ -156,9 +156,10 @@ export function generatePack({ task, cwd, maxFiles = DEFAULT_MAX_FILES, maxLines
   const consideredFiles = rankedFiles.slice(0, maxFiles);
   const candidates = consideredFiles.map((file) => buildSnippet(file, keywords, cwd, maxLines));
   const budget = buildTokenBudget({ candidates, files, consideredFiles, cwd });
-  const provisional = renderPack({ task, cwd, git, keywords, candidates, budget, lang });
+  const render = format === "hook-compact" ? renderHookCompactPack : renderPack;
+  const provisional = render({ task, cwd, git, keywords, candidates, budget, lang });
   const finalBudget = finalizeTokenBudget(budget, estimateTokens(provisional));
-  const markdown = renderPack({ task, cwd, git, keywords, candidates, budget: finalBudget, lang });
+  const markdown = render({ task, cwd, git, keywords, candidates, budget: finalBudget, lang });
 
   return {
     markdown,
@@ -1055,6 +1056,40 @@ ${files}
 
 ## ${text.snippets}
 ${snippets || text.noSnippets}
+`;
+}
+
+// Compact rendering for the Claude Code hook path. Hook additionalContext is
+// capped at 10,000 characters by Claude Code — anything larger is offloaded to
+// a file and the model only sees a short preview, which silently discards the
+// pack. This form drops everything the model already has (the prompt itself)
+// or does not need mid-conversation (suggested prompt, repo/git/keyword
+// headers), and puts the snippets first so a truncated view still leads with
+// the highest-value content. The full rendering for `pack` and MCP callers is
+// renderPack above and is unchanged.
+function renderHookCompactPack({ candidates, budget, lang }) {
+  const text = labelsFor(lang);
+  const files = candidates.length > 0
+    ? candidates.map((item) => `- ${item.file} (~${formatNumber(item.estimatedTokens)} ${text.tokensFullFile})`).join("\n")
+    : `- ${text.noRelevantFiles}`;
+
+  const snippets = candidates.map((item) => {
+    const language = languageFor(item.file);
+    return `### ${item.file}\n\n\`\`\`${language}\n${item.snippet}\n\`\`\``;
+  }).join("\n\n");
+
+  return `# ${text.title}
+
+## ${text.snippets}
+${snippets || text.noSnippets}
+
+## ${text.relevantFiles}
+${files}
+
+## ${text.tokenBudget}
+- ${text.generatedPack}: ~${formatNumber(budget.packTokens)} ${text.tokens}
+- ${text.selectedFullFiles}: ~${formatNumber(budget.selectedFullTokens)} ${text.tokens} (${budget.selectedFileCount} ${text.files})
+- ${text.estimatedSaved}: ~${formatNumber(budget.savedTokens)} ${text.tokens} (${budget.savedPercent}%)
 `;
 }
 

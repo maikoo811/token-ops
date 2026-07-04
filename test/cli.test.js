@@ -123,6 +123,51 @@ test("claude prompt hook emits additional compact context", () => {
   assert.match(parsed.hookSpecificOutput.additionalContext, /README\.md/);
 });
 
+test("hook pack is compact: no task echo, snippets first, no full-form sections", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-hook-compact-"));
+  execFileSync("git", ["init"], { cwd, stdio: "ignore" });
+  writeFileSync(join(cwd, "importer.js"), "export function importCsv(row) {\n  return row.csv_id;\n}\n");
+
+  // A long prompt with a distinctive marker sentence. Echoing it back would
+  // double the prompt's footprint against the 10,000-character hook cap.
+  const marker = "UNIQUE_TASK_MARKER_SENTENCE_THAT_MUST_NOT_BE_ECHOED";
+  const prompt = `fix csv importer ${marker} ${"detail ".repeat(200)}`;
+
+  const output = execFileSync(process.execPath, [cli, "hook", "claude-user-prompt-submit"], {
+    cwd,
+    encoding: "utf8",
+    env: { ...process.env, TOKEN_OPS_DISABLE_LOG: "1" },
+    input: JSON.stringify({ cwd, prompt })
+  });
+
+  const context = JSON.parse(output).hookSpecificOutput.additionalContext;
+  assert.doesNotMatch(context, new RegExp(marker), "hook pack must not echo the task text");
+  assert.doesNotMatch(context, /## Suggested Prompt|## Repository|## Git Status|## Keywords/);
+  // Snippets lead; the file list and budget follow.
+  const snippetsAt = context.indexOf("## Snippets");
+  assert.notEqual(snippetsAt, -1);
+  assert.ok(snippetsAt < context.indexOf("## Relevant Files"), "snippets must come before the file list");
+  assert.ok(snippetsAt < context.indexOf("## Token Budget"), "snippets must come before the budget");
+  assert.match(context, /importer\.js/);
+});
+
+test("CLI pack keeps the full form (task echo and all sections)", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-pack-full-"));
+  execFileSync("git", ["init"], { cwd, stdio: "ignore" });
+  writeFileSync(join(cwd, "importer.js"), "export function importCsv(row) {\n  return row.csv_id;\n}\n");
+
+  const output = execFileSync(process.execPath, [cli, "pack", "fix csv importer"], {
+    cwd,
+    encoding: "utf8",
+    env: { ...process.env, TOKEN_OPS_DISABLE_LOG: "1" }
+  });
+
+  assert.match(output, /## Task\nfix csv importer/);
+  assert.match(output, /## Suggested Prompt/);
+  assert.match(output, /## Git Status/);
+  assert.match(output, /## Keywords/);
+});
+
 test("splits Japanese prompts into per-word keywords, not one long blob", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-ja-keywords-"));
   execFileSync("git", ["init"], { cwd, stdio: "ignore" });
