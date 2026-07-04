@@ -5,7 +5,7 @@ All notable changes to Token Ops are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.10] — 2026-07-04
 
 ### Fixed
 - The Claude Code hook now delivers a compact pack (snippets first, then the file list and budget) instead of the full pack, and never echoes the user's prompt back. Claude Code offloads hook output above 10,000 characters to a file the model only sees a ~2KB preview of; measured on a real project, 82% of hook deliveries (216/264) were offloaded this way and the snippets never reached the model, with re-reads of already-packed files at 32% and 2.0 Reads per firing as the pre-fix baseline.
