@@ -1,6 +1,6 @@
 {
   "name": "token-ops",
-  "version": "0.6.9",
+  "version": "0.6.10",
   "description": "A local Cursor plugin and CLI that reduces wasted AI coding context.",
   "type": "module",
   "author": {
