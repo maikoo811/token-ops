@@ -22,6 +22,7 @@ import {
   DEFAULT_TRIGGER_MODE,
   colorizeForTty,
   estimateContextCost,
+  buildHookAdditionalContext,
   generatePack,
   listHighCostFiles,
   simplifyForTerminal,
@@ -290,39 +291,21 @@ function runHook(values) {
   }
 
   const lang = resolveLanguage(DEFAULT_LANG, prompt);
-  const result = generatePack({
-    task: prompt,
-    cwd: hookCwd,
-    maxFiles: 5,
-    maxLines: 50,
-    lang,
-    format: "hook-compact"
-  });
+  const result = buildHookAdditionalContext({ task: prompt, cwd: hookCwd, lang });
   recordSessionEvent(hookCwd, {
     type: "hook",
     task: prompt,
     budget: result.budget,
-    files: result.files
+    files: result.files,
+    // Recorded only when the guard actually dropped content, so the log shows
+    // which firings were degraded to fit the character budget.
+    ...(result.degradation.droppedSnippets > 0 ? { degradation: result.degradation } : {})
   });
-
-  const intro = lang === "ja"
-    ? [
-        "Token Ops がコンパクトなリポジトリ文脈を自動追加しました。",
-        "まずこの情報を起点にし、必要な場合だけ追加ファイルを読んでください。"
-      ]
-    : [
-        "Token Ops added this compact repository context automatically.",
-        "Use it as a starting point and avoid broad file reads unless necessary."
-      ];
 
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: {
       hookEventName: "UserPromptSubmit",
-      additionalContext: [
-        ...intro,
-        "",
-        result.markdown
-      ].join("\n")
+      additionalContext: result.additionalContext
     }
   }));
 }

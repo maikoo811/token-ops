@@ -170,6 +170,71 @@ export function generatePack({ task, cwd, maxFiles = DEFAULT_MAX_FILES, maxLines
   };
 }
 
+// Claude Code offloads hook output above 10,000 characters to a file, leaving
+// the model a ~2KB preview — an offloaded pack is effectively discarded. The
+// target keeps normal packs well clear of the limit; the hard cap absorbs the
+// unresolved gap between our measurement point and Claude Code's (inline
+// deliveries up to ~10.8K characters were observed, so the exact counting
+// differs slightly), staying 500 characters under the documented limit.
+export const HOOK_CONTEXT_TARGET_CHARS = 7000;
+export const HOOK_CONTEXT_HARD_CAP_CHARS = 9500;
+
+const HOOK_INTRO = {
+  ja: [
+    "Token Ops がコンパクトなリポジトリ文脈を自動追加しました。",
+    "まずこの情報を起点にし、必要な場合だけ追加ファイルを読んでください。"
+  ],
+  en: [
+    "Token Ops added this compact repository context automatically.",
+    "Use it as a starting point and avoid broad file reads unless necessary."
+  ]
+};
+
+// Assembles the full hook additionalContext (intro + compact pack) with a
+// character-budget guarantee: the returned string never reaches Claude Code's
+// 10,000-character offload limit. Characters, not bytes or tokens — that is
+// the unit the limit is documented in. When the assembled context would
+// exceed HOOK_CONTEXT_TARGET_CHARS, snippets are dropped from the lowest-
+// ranked candidate upward until it fits (the file list always stays).
+export function buildHookAdditionalContext({ task, cwd, lang, maxFiles = 5, maxLines = 50 }) {
+  const files = listVisibleFiles(cwd);
+  const git = readGitState(cwd);
+  const keywords = extractKeywords(task);
+  const rankedFiles = rankFiles(files, keywords, git.changedFiles, cwd);
+  const consideredFiles = rankedFiles.slice(0, maxFiles);
+  const candidates = consideredFiles.map((file) => buildSnippet(file, keywords, cwd, maxLines));
+  const baseBudget = buildTokenBudget({ candidates, files, consideredFiles, cwd });
+  const intro = `${(HOOK_INTRO[lang] || HOOK_INTRO.en).join("\n")}\n\n`;
+
+  let chosen = null;
+  for (let keep = candidates.length; keep >= 0; keep -= 1) {
+    const provisional = renderHookCompactPack({ candidates, budget: baseBudget, lang, snippetLimit: keep });
+    const budget = finalizeTokenBudget(baseBudget, estimateTokens(provisional));
+    const context = intro + renderHookCompactPack({ candidates, budget, lang, snippetLimit: keep });
+    chosen = { context, budget, keep };
+    if (context.length <= HOOK_CONTEXT_TARGET_CHARS) {
+      break;
+    }
+  }
+
+  // Backstop for pathological inputs (e.g. extremely long file paths): the
+  // list-only form should always fit, but the guarantee must not depend on it.
+  let additionalContext = chosen.context;
+  if (additionalContext.length > HOOK_CONTEXT_HARD_CAP_CHARS) {
+    additionalContext = additionalContext.slice(0, HOOK_CONTEXT_HARD_CAP_CHARS);
+  }
+
+  return {
+    additionalContext,
+    budget: chosen.budget,
+    files: candidates.map((item) => item.file),
+    degradation: {
+      droppedSnippets: candidates.length - chosen.keep,
+      finalChars: additionalContext.length
+    }
+  };
+}
+
 export function estimateContextCost({ cwd, task = "", maxFiles = DEFAULT_MAX_FILES }) {
   const files = listVisibleFiles(cwd);
   const git = readGitState(cwd);
@@ -1067,16 +1132,22 @@ ${snippets || text.noSnippets}
 // headers), and puts the snippets first so a truncated view still leads with
 // the highest-value content. The full rendering for `pack` and MCP callers is
 // renderPack above and is unchanged.
-function renderHookCompactPack({ candidates, budget, lang }) {
+//
+// snippetLimit renders excerpts for only the first N candidates while keeping
+// the full file list — buildHookAdditionalContext lowers it step by step when
+// the assembled context would cross the character budget.
+function renderHookCompactPack({ candidates, budget, lang, snippetLimit = Infinity }) {
   const text = labelsFor(lang);
   const files = candidates.length > 0
     ? candidates.map((item) => `- ${item.file} (~${formatNumber(item.estimatedTokens)} ${text.tokensFullFile})`).join("\n")
     : `- ${text.noRelevantFiles}`;
 
-  const snippets = candidates.map((item) => {
+  const snippetCandidates = candidates.slice(0, snippetLimit);
+  const snippetsOmitted = snippetCandidates.length < candidates.length;
+  const snippets = snippetCandidates.map((item) => {
     const language = languageFor(item.file);
     return `### ${item.file}\n\n\`\`\`${language}\n${item.snippet}\n\`\`\``;
-  }).join("\n\n");
+  }).join("\n\n") + (snippetsOmitted ? `${snippetCandidates.length > 0 ? "\n\n" : ""}${text.snippetsOmitted}` : "");
 
   return `# ${text.title}
 
@@ -1117,7 +1188,8 @@ function labelsFor(lang) {
       snippets: "抜粋",
       clean: "Clean",
       noRelevantFiles: "タスクのキーワードから関連するtracked fileが見つかりませんでした。",
-      noSnippets: "(抜粋は生成されませんでした。)"
+      noSnippets: "(抜粋は生成されませんでした。)",
+      snippetsOmitted: "(一部の抜粋はフックの文字数上限のため省略されました。上のファイル一覧から必要な範囲だけ読んでください。)"
     };
   }
 
@@ -1143,7 +1215,8 @@ function labelsFor(lang) {
     snippets: "Snippets",
     clean: "Clean",
     noRelevantFiles: "No relevant tracked files found from task keywords.",
-    noSnippets: "(No snippets generated.)"
+    noSnippets: "(No snippets generated.)",
+    snippetsOmitted: "(Some snippets were omitted to stay under the hook size limit. Read only the needed ranges from the file list above.)"
   };
 }
 

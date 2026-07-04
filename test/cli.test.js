@@ -151,6 +151,29 @@ test("hook pack is compact: no task echo, snippets first, no full-form sections"
   assert.match(context, /importer\.js/);
 });
 
+test("hook records degradation in the session log when snippets are dropped", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "token-ops-hook-degrade-log-"));
+  execFileSync("git", ["init"], { cwd, stdio: "ignore" });
+  // One file whose snippet alone exceeds the character target.
+  const line = `const alpha = "${"x".repeat(400)}";`;
+  writeFileSync(join(cwd, "alpha.js"), Array(60).fill(line).join("\n") + "\n");
+  execFileSync("git", ["add", "."], { cwd });
+  execFileSync("git", ["-c", "user.email=t@e.com", "-c", "user.name=T", "commit", "-qm", "init"], { cwd });
+
+  const output = execFileSync(process.execPath, [cli, "hook", "claude-user-prompt-submit"], {
+    cwd,
+    encoding: "utf8",
+    input: JSON.stringify({ cwd, prompt: "inspect alpha usage" })
+  });
+
+  assert.ok(JSON.parse(output).hookSpecificOutput.additionalContext.length < 10000);
+  const rows = readFileSync(join(cwd, ".token-ops", "session.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+  const hookRow = rows.find((r) => r.type === "hook");
+  assert.ok(hookRow.degradation, "degraded firing must be marked in the log");
+  assert.ok(hookRow.degradation.droppedSnippets >= 1);
+  assert.ok(hookRow.degradation.finalChars < 10000);
+});
+
 test("CLI pack keeps the full form (task echo and all sections)", () => {
   const cwd = mkdtempSync(join(tmpdir(), "token-ops-pack-full-"));
   execFileSync("git", ["init"], { cwd, stdio: "ignore" });

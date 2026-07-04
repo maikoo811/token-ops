@@ -5,10 +5,13 @@ import { join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildHookAdditionalContext,
   colorizeForTty,
   extractKeywords,
   estimateTokens,
   finalizeTokenBudget,
+  HOOK_CONTEXT_HARD_CAP_CHARS,
+  HOOK_CONTEXT_TARGET_CHARS,
   simplifyForTerminal,
   readSavingsReport,
   renderSavingsReport,
@@ -19,6 +22,71 @@ import {
   shouldInjectForPrompt,
   resolveLanguage
 } from "../src/core.js";
+
+// ---- buildHookAdditionalContext (character guard) ----
+
+// Repo where each of five files matches the task keyword with lines sized so
+// the snippet payload lands where the test needs it.
+function hookGuardRepo(prefix, fileCount, lineLength, lineCount) {
+  const cwd = mkdtempSync(join(tmpdir(), prefix));
+  execFileSync("git", ["init", "-q"], { cwd });
+  for (let i = 0; i < fileCount; i += 1) {
+    const line = `const alpha${i} = "${"x".repeat(lineLength)}";`;
+    writeFileSync(join(cwd, `alpha-${i}.js`), Array(lineCount).fill(line).join("\n") + "\n");
+  }
+  execFileSync("git", ["add", "."], { cwd });
+  execFileSync("git", ["-c", "user.email=t@e.com", "-c", "user.name=T", "commit", "-qm", "init"], { cwd });
+  return cwd;
+}
+
+test("hook context guard: small repo delivers all snippets, no degradation", () => {
+  const cwd = hookGuardRepo("token-ops-guard-small-", 2, 20, 5);
+  const out = buildHookAdditionalContext({ task: "inspect alpha usage", cwd, lang: "en" });
+  assert.equal(out.degradation.droppedSnippets, 0);
+  assert.match(out.additionalContext, /```js/);
+  assert.ok(out.additionalContext.length <= HOOK_CONTEXT_TARGET_CHARS);
+});
+
+test("hook context guard: drops lowest-ranked snippets to fit the target", () => {
+  // 5 snippets ≈ 1.6K chars each ≈ 8K total with headers — just over the target.
+  const cwd = hookGuardRepo("token-ops-guard-degrade-", 5, 30, 60);
+  const out = buildHookAdditionalContext({ task: "inspect alpha usage", cwd, lang: "en" });
+  assert.ok(out.degradation.droppedSnippets >= 1, "at least one snippet must be dropped");
+  assert.ok(out.degradation.droppedSnippets < 5, "not all snippets should be needed to fit");
+  assert.ok(out.additionalContext.length <= HOOK_CONTEXT_TARGET_CHARS);
+  // The file list keeps every candidate even when its snippet was dropped.
+  for (let i = 0; i < 5; i += 1) {
+    assert.match(out.additionalContext, new RegExp(`alpha-${i}\\.js`));
+  }
+  assert.match(out.additionalContext, /omitted to stay under the hook size limit/);
+});
+
+test("hook context guard: falls back to the list-only form when one snippet is too large", () => {
+  // A single snippet ≈ 20K chars exceeds the target on its own.
+  const cwd = hookGuardRepo("token-ops-guard-listonly-", 1, 400, 60);
+  const out = buildHookAdditionalContext({ task: "inspect alpha usage", cwd, lang: "en" });
+  assert.equal(out.degradation.droppedSnippets, 1);
+  assert.doesNotMatch(out.additionalContext, /```/, "no snippet fence in the list-only form");
+  assert.match(out.additionalContext, /alpha-0\.js/);
+  assert.ok(out.additionalContext.length <= HOOK_CONTEXT_HARD_CAP_CHARS);
+});
+
+test("hook context guard: invariant — output always stays under 10,000 characters", () => {
+  const repos = [
+    hookGuardRepo("token-ops-guard-inv1-", 2, 20, 5),
+    hookGuardRepo("token-ops-guard-inv2-", 5, 30, 60),
+    hookGuardRepo("token-ops-guard-inv3-", 5, 400, 60)
+  ];
+  for (const cwd of repos) {
+    for (const lang of ["en", "ja"]) {
+      const out = buildHookAdditionalContext({ task: "inspect alpha usage", cwd, lang });
+      assert.ok(
+        out.additionalContext.length < 10000,
+        `context must stay under the offload limit (got ${out.additionalContext.length})`
+      );
+    }
+  }
+});
 
 // ---- extractKeywords ----
 
